@@ -31,13 +31,11 @@ Solo tienes que:
 
 Principalmente se trataría de:
 
+- crear un modulador
 - crear módulos
 - cargar módulos (asíncrono)
 - acceder módulos
 
-Pero también se puede:
-
-- crear un modulador
 
 ### Crear un modulador
 
