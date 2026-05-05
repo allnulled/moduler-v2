@@ -105,4 +105,5 @@ modulador.get("object 4");
 
 ## Ejemplos
 
-Los tests son `test/*.test.js`.
+Los tests están en [`test/*.test.js`](https://github.com/allnulled/moduler-v2/tree/main/test).
+
