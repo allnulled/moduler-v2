@@ -41,7 +41,7 @@ Pero también se puede:
 
 ### Crear un modulador
 
-Con cada instancia de modulador tienes un nombre de espacios de módulos cerrado:
+Con cada instancia de modulador tienes un espacio de nombres de módulos cerrado:
 
 ```js
 const modulador = new ModulerV2();
@@ -120,7 +120,7 @@ Hay diferentes tipos de módulos, que se cargan de diferentes maneras cada uno.
 
 ### Módulo tipo: module
 
-El básico: lo que pongasm es el módulo.
+El básico: lo que pongas en `module` es el módulo tal cual.
 
 ```js
 modulador.define({
@@ -144,6 +144,10 @@ modulador.define({
 modulador.assert(101 === await modulador.load("tipo fábrica"));
 ```
 
+- Admite `async functions` también.
+- Y si una función `function` devuelve una `Promise`, se entiende como `async function`.
+- Esto implica que no puedes hacer que una `factory` devuelva una `Promise` directamente, porque se resolverá. Puedes devolverla envuelta en algo, pero no únicamente `Promise`.
+
 ### Módulo tipo: url
 
 Este tipo utiliza `fetch + eval` y espera que en su js definas el recurso:
@@ -158,7 +162,7 @@ modulador.define({
 });
 ```
 
-Si es un recurso que no usa el modulador pero querrías, como cualquier recurso de terceros normal, puedes usar el `getter` a modo de adaptador.
+- Si es un recurso que no usa el modulador pero querrías, como cualquier recurso de terceros normal, puedes usar el `getter` a modo de adaptador.
 
 ### Módulo tipo: file
 
@@ -175,13 +179,11 @@ modulador.define({
 });
 ```
 
-Si es un recurso que no usa `require/module.exports` sino `import/export`, tienes el flag de `flavour="import"` para especificarlo.
-
-Si es un recurso que directamente es un fragmento de código que devuelve algo con un `return`, tienes el flag de `flavour="eval"` para especificarlo, nótese que admiten `await` en el scope inmediato.
-
-En cualquier caso, tienes el `getter` a modo de adaptador también.
-
-Las rutas son relativas al método en cada caso: `require`, `import` o `new AsyncFunction` en caso de `eval`.
+- Si es un recurso que no usa `require/module.exports` sino `import/export`, tienes el flag de `flavour="import"` para especificarlo.
+- Si es un recurso que directamente es un fragmento de código que devuelve algo con un `return`, tienes el flag de `flavour="eval"` para especificarlo
+   - nótese que los fragmentos en `eval` admiten `await` en el scope inmediato.
+- En cualquier caso, tienes el `getter` a modo de adaptador también.
+- Las rutas son relativas al método en cada caso: `require`, `import` o `new AsyncFunction` en caso de `eval`.
 
 ### Módulo tipo: path
 
@@ -197,7 +199,7 @@ modulador.define({
 });
 ```
 
-Las rutas son relativas al método de importación que se termine usando.
+- Las rutas son relativas al método de importación que se termine usando.
 
 ## Ejemplos
 
