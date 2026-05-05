@@ -1,0 +1,12 @@
+{
+  "name": "moduler-v2",
+  "version": "1.0.0",
+  "main": "moduler-v2.js",
+  "scripts": {
+    "dev": "bash dev.sh"
+  },
+  "keywords": [],
+  "author": "allnulled",
+  "license": "WTFPL",
+  "description": "JavaScript modules in a few lines"
+}
