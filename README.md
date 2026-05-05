@@ -29,6 +29,10 @@ Principalmente se trataría de:
 - cargar módulos (asíncrono)
 - acceder módulos
 
+Pero también se puede:
+
+- crear un modulador
+
 ### Crear un modulador
 
 Con cada instancia de modulador tienes un nombre de espacios de módulos cerrado:
