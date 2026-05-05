@@ -2,15 +2,10 @@
 
 Módulos programáticos en JavaScript no opinionado.
 
-## Instalación
-
-Importar el `moduler-v2.js` y acceder a `ModulerV2`.
-
-## Uso
-
-Te interesa saber:
+## Índice
 
 - [moduler-v2](#moduler-v2)
+  - [Índice](#índice)
   - [Instalación](#instalación)
   - [Uso](#uso)
     - [Crear un modulador](#crear-un-modulador)
@@ -18,6 +13,21 @@ Te interesa saber:
     - [Cargar un módulo](#cargar-un-módulo)
     - [Acceder un módulo](#acceder-un-módulo)
   - [Ejemplos](#ejemplos)
+
+## Instalación
+
+Solo tienes que:
+
+- Importar el fichero [`moduler-v2.js`](https://github.com/allnulled/moduler-v2/blob/main/moduler-v2.js)
+- Acceder a [`ModulerV2`](https://github.com/allnulled/moduler-v2/blob/main/moduler-v2.js#L23).
+
+## Uso
+
+Principalmente se trataría de:
+
+- crear módulos
+- cargar módulos (asíncrono)
+- acceder módulos
 
 ### Crear un modulador
 
