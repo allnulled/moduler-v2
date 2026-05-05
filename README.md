@@ -57,13 +57,13 @@ O puedes definirlo con una **fábrica síncrona o asíncrona** con `factory`:
 ```js
 modulador.define({
     name: "object 2",
-    module: function() {
+    factory: function() {
         return 200;
     }
 });
 modulador.define({
     name: "object 3",
-    module: async function() {
+    factory: async function() {
         await new Promise(resolve => { setTimeout(resolve, 1000); });
         return 300;
     }
