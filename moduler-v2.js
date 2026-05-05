@@ -39,15 +39,19 @@
     }
 
     // Define un módulo
-    define({ name, requires = [], factory, module }) {
+    define(options) {
+      this.assert(typeof options === "object", "only object accepted");
+      const { name } = options;
       this.assert(typeof name === "string", "name required");
-
       // Guarda la definición del módulo
       this.modules.set(name, {
-        requires,          // dependencias
-        factory,           // función que construye el módulo
-        module,            // valor directo si no hay factory
-        type: factory ? "factory" : "value" // tipo de módulo
+        ...options,
+        type: options.module ? "value" :
+          options.factory ? "factory" :
+          options.file ? "file" :
+          options.url ? "url" :
+          options.path ? "path" :
+          "value"
       });
     }
 
@@ -97,14 +101,26 @@
         if (mod.type === "value") {
           // Valor directo
           result = mod.module;
-        } else {
+        } else if(mod.type === "factory") {
           // Ejecutar factory con deps
           result = mod.factory(...deps);
-
           // Soporte async factories
           if (result instanceof Promise) {
             result = await result;
           }
+        } else if(mod.type === "file") {
+          result = await this.loadFile(mod.file, mod.arguments || {}, mod.flavour || "require");
+        } else if(mod.type === "url") {
+          result = await this.loadUrl(mod.url, mod.arguments || {});
+        } else if(mod.type === "path") {
+          result = await this.loadPath(mod.path, mod.arguments);
+        } else {
+          throw new Error(`module type not recognized: ${mod.type}`);
+        }
+
+        // 4.1. Aplicar el getter del módulo, si provee:
+        if(typeof mod.getter === "function") {
+          result = await mod.getter(result, mod, this);
         }
 
         // 5. Si hay placeholder y el resultado es objeto
@@ -147,6 +163,49 @@
       this.assert(this.cache.has(id), "module not loaded yet");
       return this.cache.get(id);
     }
+
+    loadFile(file, parameters = {}, flavour = "require") {
+      this.assert(typeof file === "string", "file must be string");
+      this.assert(typeof parameters === "object", "parameters must be object");
+      this.assert(typeof flavour === "string", "flavour must be string");
+      if(flavour === "require") {
+        return require(file);
+      } else if(flavour === "import") {
+        return import(file);
+      } else if(flavour === "eval") {
+        return require("fs").promises.readFile(file, "utf8").then(code => this.evaluateAsync(code));
+      }
+      throw new Error("flavour must be known");
+    }
+
+    async loadUrl(url, parameters = {}) {
+      this.assert(typeof url === "string", "url must be string");
+      this.assert(typeof parameters === "object", "parameters must be object");
+      return fetch(url).then(res => res.text()).then(code => this.evaluateAsync(code, parameters));
+    }
+
+    async loadPath(path, parameters = {}) {
+      this.assert(typeof path === "string", "path must be string");
+      this.assert(typeof parameters === "object", "parameters must be object");
+      if(typeof global !== "undefined") return this.loadFile(path, parameters);
+      return this.loadUrl(path, parameters);
+    }
+
+    evaluateAsync(code, parameters = {}) {
+      this.assert(typeof code === "string", "code must be string");
+      this.assert(typeof parameters === "object", "parameters must be object");
+      const AsyncFunction = (async function() {}).constructor;
+      const asyncFunction = new AsyncFunction(...Object.keys(parameters), code);
+      return asyncFunction(...Object.values(parameters));
+    }
+
+    evaluateSync(code, parameters = {}) {
+      this.assert(typeof code === "string", "code must be string");
+      this.assert(typeof parameters === "object", "parameters must be object");
+      const syncFunction = new Function(...Object.keys(parameters), code);
+      return syncFunction(...Object.values(parameters));
+    }
+
   };
 
   // Export del sistema
