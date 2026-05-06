@@ -17,4 +17,5 @@ refrescador \
   -e "json" \
   -e "css" \
   -e "html" \
+  -x 'node $(pwd)/build.js' \
   -x 'node $(pwd)/test/test.js @{refrescador.file}'

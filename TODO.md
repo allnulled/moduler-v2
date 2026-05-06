@@ -1,0 +1,13 @@
+- [ ] empezar clase ModulerV2Compiler como extends de ModulerV2
+   - [ ] sobreescribir método resolveModule solamente
+      - [ ] para que guarde la información de todos los módulos
+      - [ ] en 2 pasos como rollup:
+         - [ ] bundler: devuelve bundle
+         - [ ] writer: el bundle se autopersiste
+         - [ ] esto permitirá usar el bundle para otras cosas que no sean persistir:
+            - [ ] análisis de dependencias
+            - [ ] análisis de código principalmente, pero que no es poco
+      - [ ] tiene que permitir que:
+         - [ ] el bundler funcione en entorno web igual que en node.js
+            - [ ] es el writer el que se opiniona a node.js
+         - [ ] 

@@ -25,6 +25,8 @@ Módulos programáticos en JavaScript (nodejs o browser).
     - [Módulo directo](#módulo-directo)
     - [Carga y llamada directa a módulo predefinido de tipo función](#carga-y-llamada-directa-a-módulo-predefinido-de-tipo-función)
     - [Carga e instanciación directa de módulo predefinido de tipo clase](#carga-e-instanciación-directa-de-módulo-predefinido-de-tipo-clase)
+  - [Uso avanzado - nivel 2](#uso-avanzado---nivel-2)
+    - [Obtener tu compilador](#obtener-tu-compilador)
 
 ## Instalación
 
@@ -213,6 +215,8 @@ modulador.define({
 
 Hay algunas acciones más avanzadas que te serán interesantes.
 
+El **nivel 1** se caracteriza por ser las **features que primero se me ocurrieron**, no voy a maquillarlo: entre fáciles de hacer y más o menos interesantes.
+
 ### Módulos y dependencias anónimos
 
 Puedes crear módulos anónimos y dependencias anónimas si no especificas el `name`, en cuyo caso pierde las propiedades de cacheo, pero es válido para los dos casos.
@@ -300,3 +304,20 @@ moduler.define({
 
 moduler.assert(15 === (await moduler.new("clase/1", [5, 10])).c, "moduler.prototype.new está fallando");
 ```
+
+## Uso avanzado - nivel 2
+
+El uso avanzado nivel 2 se caracteriza por orientarse a **features relacionadas con la compilación de código** y no solamente con la modulación.
+
+Para ello se explotará la clase `ModulerV2Compiler` y otras relacionadas, como `ModulerV2Compilation`.
+
+### Obtener tu compilador
+
+El compilador `ModulerV2Compiler` es una clase que hereda del modulador `ModulerV2` porque tiene que hacer prácticamente lo mismo.
+
+```js
+const nodeCompiler = new ModulerV2Compiler(process.cwd());
+const webCompiler = new ModulerV2Compiler(window.location.protocol +"//"+ window.location.host + window.location.pathname);
+```
+
+Esta sección todavía está en desarrollo, pero los valores por defecto en cada entorno serían esos.

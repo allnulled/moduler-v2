@@ -1,4 +1,4 @@
-const { ModulerV2 } = require(__dirname + "/../moduler-v2.js");
+const { ModulerV2 } = require(__dirname + "/../moduler-v2.dist.js");
 
 const main = async function() {
   

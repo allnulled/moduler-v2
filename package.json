@@ -1,12 +1,12 @@
 {
   "name": "moduler-v2",
   "version": "1.0.0",
-  "main": "moduler-v2.js",
+  "main": "moduler-v2.dist.js",
   "scripts": {
     "dev": "bash dev.sh"
   },
   "keywords": [],
   "author": "allnulled",
   "license": "WTFPL",
-  "description": "JavaScript modules in a few lines"
+  "description": "Módulos programáticos en JavaScript para nodejs o browser"
 }

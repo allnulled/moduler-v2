@@ -19,13 +19,15 @@
   const ModulerV2 = class Moduler {
 
     constructor() {
-      // Definiciones de módulos: name → config
-      this.modules = new Map();
-      // Cache de resultados finales (o placeholders)
-      this.cache = new Map();
-      // Promises en curso (para evitar ejecuciones duplicadas)
-      this.pending = new Map();
+      this.modules = new Map(); // Definiciones de módulos: name → config
+      this.cache = new Map(); // Cache de resultados finales (o placeholders)
+      this.pending = new Map(); // Promises en curso (para evitar ejecuciones duplicadas)
     }
+
+    env = {
+      isNodejs: (typeof global !== "undefined") && (typeof require !== "undefined") && (typeof process !== "undefined"),
+      isBrowser: (typeof window !== "undefined") && (typeof document !== "undefined") && (typeof location !== "undefined"),
+    };
 
     // Assert simple para validaciones internas
     assert(condition, message) {
@@ -37,6 +39,7 @@
       this.assert(typeof options === "object", "only object accepted");
       const { name } = options;
       this.assert(typeof name === "string", "name required");
+      // Guarda la definición del módulo
       this.modules.set(name, {
         ...options,
         type: this.getModuleType(options)
@@ -163,8 +166,8 @@
     };
 
     // Carga un módulo (core del sistema)
-    async load(input) {
-      const ctx = this.onLoad.getNewContext();
+    async load(input, inputCtx = undefined) {
+      const ctx = inputCtx || this.onLoad.getNewContext();
       // Preparamos el input según su tipo:
       if (this.onLoad.inputIsObject(input)) this.onLoad.presetModuleAsObject(input, ctx);
       else if (this.onLoad.inputIsString(input)) this.onLoad.resetsIdBasedOnInputTypeString(input, ctx);
@@ -187,20 +190,34 @@
     async call(id, args = [], scope = false) {
       const fn = await this.load(id);
       this.assert(typeof fn === "function", "module is not callable");
-      return await (scope ? fn.call(scope, ...Array.isArray(args) ? args : [args]) : fn(...Array.isArray(args) ? args : [args]));
+      const finalArgs = Array.isArray(args) ? args : [args];
+      return await (scope ? fn.call(scope, ...finalArgs) : fn(...finalArgs));
     }
 
     // Crea una instancia de un módulo (tipo clase)
-    async instantiate(id, args = []) {
+    async new(id, args = []) {
       const clazz = await this.load(id);
       this.assert(typeof clazz === "function", "module is not callable");
-      return new clazz(...Array.isArray(args) ? args : [args] : fn(...Array.isArray(args) ? args : [args]));
+      const finalArgs = Array.isArray(args) ? args : [args];
+      return new clazz(...finalArgs);
     }
 
     // Obtener módulo ya cargado (sin async)
     get(id) {
-      this.assert(this.cache.has(id), "module not found: " + id);
+      this.assert(this.cache.has(id), "module not loaded yet");
       return this.cache.get(id);
+    }
+
+    readFile(file) {
+      return require("fs").promises.readFile(file, "utf8");
+    }
+
+    readUrl(url) {
+      return fetch(url).then(res => res.text());
+    }
+
+    readPath(path) {
+      return this.env.isNodejs ? this.readFile(path) : this.readUrl(path);
     }
 
     loadFile(file, parameters = {}, flavour = "require") {
@@ -212,22 +229,21 @@
       } else if (flavour === "import") {
         return import(file);
       } else if (flavour === "eval") {
-        return require("fs").promises.readFile(file, "utf8").then(code => this.evaluateAsync(code));
+        return this.readFile(file).then(code => this.evaluateAsync(code));
       }
-      throw new Error("flavour must be known: require, import or eval");
+      throw new Error("flavour must be known");
     }
 
     async loadUrl(url, parameters = {}) {
       this.assert(typeof url === "string", "url must be string");
       this.assert(typeof parameters === "object", "parameters must be object");
-      return fetch(url).then(res => res.text()).then(code => this.evaluateAsync(code, parameters));
+      return this.readUrl(url).then(code => this.evaluateAsync(code, parameters));
     }
 
-    async loadPath(path, parameters = {}) {
+    loadPath(path, parameters = {}) {
       this.assert(typeof path === "string", "path must be string");
       this.assert(typeof parameters === "object", "parameters must be object");
-      if (typeof global !== "undefined") return this.loadFile(path, parameters);
-      return this.loadUrl(path, parameters);
+      return this.env.isNodejs ? this.loadFile(path) : this.loadUrl(path);
     }
 
     evaluateAsync(code, parameters = {}) {
@@ -235,6 +251,7 @@
       this.assert(typeof parameters === "object", "parameters must be object");
       const AsyncFunction = (async function () { }).constructor;
       const asyncFunction = new AsyncFunction(...Object.keys(parameters), code);
+      // console.log(code);
       return asyncFunction(...Object.values(parameters));
     }
 
@@ -242,12 +259,51 @@
       this.assert(typeof code === "string", "code must be string");
       this.assert(typeof parameters === "object", "parameters must be object");
       const syncFunction = new Function(...Object.keys(parameters), code);
+      // console.log(code);
       return syncFunction(...Object.values(parameters));
+    }
+
+    newCompiler() {
+      return new ModulerV2Compiler({ moduler: this });
     }
 
   };
 
+  const ModulerV2Bundle = class ModulerV2Bundle {
+    
+      constructor(bundleOptions) {
+        this.options = bundleOptions;
+      }
+    
+      async write(writeOptionsUser = {}) {
+        const writeOptions = Object.assign({}, writeOptionsUser);
+        return undefined;
+      }
+    
+    };
+  
+  const ModulerV2Compiler = class ModulerV2Compiler {
+  
+    constructor(compilerOptions = {}) {
+      Object.assign(this, compilerOptions);
+      this.assert(this.moduler instanceof ModulerV2, "required «moduler» instance of «ModulerV2»");
+    }
+  
+    assert(condition, message) {
+      if (!condition) throw new Error(message || "assert failed");
+    }
+  
+    bundle(target, bundleOptionsUser = {}) {
+      return new ModulerV2Bundle(Object.assign({ target }, bundleOptionsUser));
+    }
+  
+  };
+  
+
+  ModulerV2.Compiler = ModulerV2Compiler;
+  ModulerV2.Bundle = ModulerV2Bundle;
+
   // Export del sistema
-  return { ModulerV2 };
+  return { ModulerV2, ModulerV2Compiler, ModulerV2Bundle };
 
 });
