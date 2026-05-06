@@ -8,6 +8,7 @@ Módulos programáticos en JavaScript (nodejs o browser).
   - [Índice](#índice)
   - [Instalación](#instalación)
   - [Uso](#uso)
+  - [Ejemplos](#ejemplos)
     - [Crear un modulador](#crear-un-modulador)
     - [Definir un módulo](#definir-un-módulo)
     - [Cargar un módulo](#cargar-un-módulo)
@@ -18,7 +19,10 @@ Módulos programáticos en JavaScript (nodejs o browser).
     - [Módulo tipo: url](#módulo-tipo-url)
     - [Módulo tipo: file](#módulo-tipo-file)
     - [Módulo tipo: path](#módulo-tipo-path)
-  - [Ejemplos](#ejemplos)
+  - [Uso avanzado - nivel 1](#uso-avanzado---nivel-1)
+    - [Módulos y dependencias anónimos](#módulos-y-dependencias-anónimos)
+    - [Dependencias directas](#dependencias-directas)
+    - [Módulo directo](#módulo-directo)
 
 ## Instalación
 
@@ -36,6 +40,9 @@ Principalmente se trataría de:
 - cargar módulos (asíncrono)
 - acceder módulos
 
+## Ejemplos
+
+Los tests están en [`test/*.test.js`](https://github.com/allnulled/moduler-v2/tree/main/test).
 
 ### Crear un modulador
 
@@ -199,7 +206,47 @@ modulador.define({
 
 - Las rutas son relativas al método de importación que se termine usando.
 
-## Ejemplos
 
-Los tests están en [`test/*.test.js`](https://github.com/allnulled/moduler-v2/tree/main/test).
+## Uso avanzado - nivel 1
+
+Hay algunas acciones más avanzadas que te serán interesantes.
+
+### Módulos y dependencias anónimos
+
+Puedes crear módulos anónimos y dependencias anónimas si no especificas el `name`, en cuyo caso pierde las propiedades de cacheo, pero es válido para los dos casos.
+
+Si haces esto, usas directamente `ModulerV2.prototype.load` sin pasar antes por `ModulerV2.prototype.define` ni esperar retomar con `ModulerV2.prototype.get`.
+
+### Dependencias directas
+
+Las dependencias directas es que en lugar de pasarle un `id:string` en el `requires`, le pasas un `modulo:object` directamente.
+
+En el test [300.001. Dependencias directas.test.js](https://github.com/allnulled/moduler-v2/blob/main/test/300.001.%20Dependencias%20directas.test.js) tienes un ejemplo de cómo se usarían:
+
+```js
+moduler.define({
+  name: "dependencias directas",
+  requires: [
+    { module: 1 },
+    { factory: () => 2 },
+    { file: "./test/res/file-module-using-require-2.js" },
+  ],
+  factory: function(d1, d2, d3) {
+    return d1 + d2 + d3;
+  }
+});
+moduler.assert(6 === await moduler.load("dependencias directas"), "dependencias directas fallan");
+```
+
+### Módulo directo
+
+Igual que a una dependencia puedes referirte con un objeto directo, a un módulo también.
+
+Es decir que en lugar de usar la firma `ModulerV2.prototype.load(id:string)`, puedes usar la firma `ModulerV2.prototype.load(modulo:object)` también.
+
+En el test [300.002. Módulos directos.test.js](https://github.com/allnulled/moduler-v2/blob/main/test/300.002.%20M%C3%B3dulos%20directos.test.js) tienes un ejemplo de cómo se usaría:
+
+```js
+moduler.assert(500 === await moduler.load({ factory: () => 500 }), "modulos directos fallan");
+```
 

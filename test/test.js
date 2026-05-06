@@ -11,7 +11,8 @@ const main = async function() {
       try {
         await require(`${__dirname}/${file}`)(new ModulerV2());
       } catch (error) {
-        errors.push({ file, error });
+        console.error("Fails on: " + file);
+        errors.push({ test: file, error });
       }
     }
   }

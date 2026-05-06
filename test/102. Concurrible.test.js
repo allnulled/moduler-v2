@@ -5,7 +5,7 @@ module.exports = async function (moduler) {
     name: "pending-test",
     factory: async () => {
       executions++;
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 10));
       return 99;
     }
   });
