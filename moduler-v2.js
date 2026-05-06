@@ -184,14 +184,20 @@
       });
     }
 
-    // Ejecuta un módulo como función
-    async call(id, arg) {
-      // Cargar módulo
+    // Ejecuta un módulo (tipo función)
+    async call(id, args = [], scope = false) {
       const fn = await this.load(id);
-      // Validar que es callable
       this.assert(typeof fn === "function", "module is not callable");
-      // Retornar llamada resuelta al módulo  con argumentos
-      return await fn(arg);
+      const finalArgs = Array.isArray(args) ? args : [args];
+      return await (scope ? fn.call(scope, ...finalArgs) : fn(...finalArgs));
+    }
+
+    // Crea una instancia de un módulo (tipo clase)
+    async new(id, args = []) {
+      const clazz = await this.load(id);
+      this.assert(typeof clazz === "function", "module is not callable");
+      const finalArgs = Array.isArray(args) ? args : [args];
+      return new clazz(...finalArgs);
     }
 
     // Obtener módulo ya cargado (sin async)

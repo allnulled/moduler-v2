@@ -23,6 +23,8 @@ Módulos programáticos en JavaScript (nodejs o browser).
     - [Módulos y dependencias anónimos](#módulos-y-dependencias-anónimos)
     - [Dependencias directas](#dependencias-directas)
     - [Módulo directo](#módulo-directo)
+    - [Carga y llamada directa a módulo predefinido de tipo función](#carga-y-llamada-directa-a-módulo-predefinido-de-tipo-función)
+    - [Carga e instanciación directa de módulo predefinido de tipo clase](#carga-e-instanciación-directa-de-módulo-predefinido-de-tipo-clase)
 
 ## Instalación
 
@@ -250,3 +252,51 @@ En el test [300.002. Módulos directos.test.js](https://github.com/allnulled/mod
 moduler.assert(500 === await moduler.load({ factory: () => 500 }), "modulos directos fallan");
 ```
 
+### Carga y llamada directa a módulo predefinido de tipo función
+
+Para usar módulos previamente definidos de tipo función, tienes el `ModulerV2.prototype.call`.
+
+En el test [300.003. Llamada directa a módulo función.test.js](https://github.com/allnulled/moduler-v2/blob/main/test/300.003.%20Llamada%20directa%20a%20m%C3%B3dulo%20funci%C3%B3n.test.js) hay un ejemplo:
+
+```js
+moduler.define({
+  name: "funcion/1",
+  module: function(a, b) {
+    return (this || 0) + a + b;
+  }
+});
+
+moduler.assert(115 === await moduler.call("funcion/1", [5, 10], 100), "moduler.prototype.call está fallando");
+```
+
+Esto evita:
+
+- Polucionar el scope con variables intermedias
+   - porque él ya extraerá el módulo función por nosotros
+- Cargar el módulo explícitamente
+   - porque él ya hace el `await load` internamente.
+- Esperar a la promesa retornada (*en `async functions` o no*) cumplirse
+   - porque él ya hace el `await result` internamente
+
+Tienes una demostración con función asíncrona en el test [300.004. Llamada directa a módulo función asíncrona.test.js](https://github.com/allnulled/moduler-v2/blob/main/test/300.004.%20Llamada%20directa%20a%20m%C3%B3dulo%20funci%C3%B3n%20as%C3%ADncrona.test.js).
+
+### Carga e instanciación directa de módulo predefinido de tipo clase
+
+Lo mismo que puedes llamar a una función, puedes crear una instancia con `ModulerV2.prototype.new`.
+
+En el test [300.005. Instanciación directa de módulo clase.test.js](https://github.com/allnulled/moduler-v2/blob/main/test/300.005.%20Instanciaci%C3%B3n%20directa%20de%20m%C3%B3dulo%20clase.test.js) hay un ejemplo:
+
+```js
+moduler.define({
+  name: "clase/1",
+  module: class {
+    constructor(a,b) {
+      this.a = a;
+      this.b = b;
+      this.c = a + b;
+    }
+  }
+});
+
+moduler.assert(15 === (await moduler.new("clase/1", [5, 10])).c, "moduler.prototype.new está fallando");
+```

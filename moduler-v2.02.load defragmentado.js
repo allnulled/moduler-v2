@@ -37,7 +37,6 @@
       this.assert(typeof options === "object", "only object accepted");
       const { name } = options;
       this.assert(typeof name === "string", "name required");
-      // Guarda la definición del módulo
       this.modules.set(name, {
         ...options,
         type: this.getModuleType(options)
@@ -164,8 +163,8 @@
     };
 
     // Carga un módulo (core del sistema)
-    async load(input, inputCtx = undefined) {
-      const ctx = inputCtx || this.onLoad.getNewContext();
+    async load(input) {
+      const ctx = this.onLoad.getNewContext();
       // Preparamos el input según su tipo:
       if (this.onLoad.inputIsObject(input)) this.onLoad.presetModuleAsObject(input, ctx);
       else if (this.onLoad.inputIsString(input)) this.onLoad.resetsIdBasedOnInputTypeString(input, ctx);
@@ -184,19 +183,23 @@
       });
     }
 
-    // Ejecuta un módulo como función
-    async call(id, arg) {
-      // Cargar módulo
+    // Ejecuta un módulo (tipo función)
+    async call(id, args = [], scope = false) {
       const fn = await this.load(id);
-      // Validar que es callable
       this.assert(typeof fn === "function", "module is not callable");
-      // Retornar llamada resuelta al módulo  con argumentos
-      return await fn(arg);
+      return await (scope ? fn.call(scope, ...Array.isArray(args) ? args : [args]) : fn(...Array.isArray(args) ? args : [args]));
+    }
+
+    // Crea una instancia de un módulo (tipo clase)
+    async instantiate(id, args = []) {
+      const clazz = await this.load(id);
+      this.assert(typeof clazz === "function", "module is not callable");
+      return new clazz(...Array.isArray(args) ? args : [args] : fn(...Array.isArray(args) ? args : [args]));
     }
 
     // Obtener módulo ya cargado (sin async)
     get(id) {
-      this.assert(this.cache.has(id), "module not loaded yet");
+      this.assert(this.cache.has(id), "module not found: " + id);
       return this.cache.get(id);
     }
 
@@ -211,7 +214,7 @@
       } else if (flavour === "eval") {
         return require("fs").promises.readFile(file, "utf8").then(code => this.evaluateAsync(code));
       }
-      throw new Error("flavour must be known");
+      throw new Error("flavour must be known: require, import or eval");
     }
 
     async loadUrl(url, parameters = {}) {
