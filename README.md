@@ -254,7 +254,7 @@ moduler.assert(500 === await moduler.load({ factory: () => 500 }), "modulos dire
 
 ### Carga y llamada directa a módulo predefinido de tipo función
 
-Para usar módulos previamente definidos de tipo función, tienes el `ModulerV2.prototype.call`.
+Para (cargar y) usar módulos previamente definidos de tipo función, tienes el `ModulerV2.prototype.call`.
 
 En el test [300.003. Llamada directa a módulo función.test.js](https://github.com/allnulled/moduler-v2/blob/main/test/300.003.%20Llamada%20directa%20a%20m%C3%B3dulo%20funci%C3%B3n.test.js) hay un ejemplo:
 
@@ -282,7 +282,7 @@ Tienes una demostración con función asíncrona en el test [300.004. Llamada di
 
 ### Carga e instanciación directa de módulo predefinido de tipo clase
 
-Lo mismo que puedes llamar a una función, puedes crear una instancia con `ModulerV2.prototype.new`.
+Para (cargar e) instanciar módulos previamente definidos de tipo clase, tienes el `ModulerV2.prototype.new`.
 
 En el test [300.005. Instanciación directa de módulo clase.test.js](https://github.com/allnulled/moduler-v2/blob/main/test/300.005.%20Instanciaci%C3%B3n%20directa%20de%20m%C3%B3dulo%20clase.test.js) hay un ejemplo:
 
