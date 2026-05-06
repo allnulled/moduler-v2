@@ -74,114 +74,87 @@
       return result;
     }
 
-    onLoad = {
-      complainOnMissingModule: (ctx) => {
-        if (ctx.id) {
-          this.assert(this.modules.has(ctx.id), `module not found: ${ctx.id}`);
-        }
-      },
-      buildsPrematureModule: (input, ctx) => {
-        ctx.modulo = {
-          ...input,
-          type: this.getModuleType(input)
-        };
-      },
-      resetsIdBasedOnInputTypeObject: (input, ctx) => {
-        ctx.id = input.name || false;
-      },
-      resetsIdBasedOnInputTypeString: (input, ctx) => {
-        ctx.id = input;
-      },
-      hasId: (ctx) => {
-        return ctx.id;
-      },
-      hasIdInCache: (ctx) => {
-        return ctx.id && this.cache.has(ctx.id);
-      },
-      hasIdInPending: (ctx) => {
-        return ctx.id && this.pending.has(ctx.id);
-      },
-      hasIdInModules: (ctx) => {
-        return ctx.id && (this.modules.has(ctx.id));
-      },
-      hasIdAndRequires: (ctx) => {
-        return ctx.id && ctx.modulo.requires && ctx.modulo.requires.length;
-      },
-      initalizePlaceholder: (ctx) => {
-        ctx.placeholder = {};
-        this.cache.set(ctx.id, ctx.placeholder);
-      },
-      loadDependencies: (ctx) => {
-        return Promise.all((ctx.modulo.requires || []).map(dep => this.load(dep)));
-      },
-      complainOfInputType: (input) => {
-        throw new Error("module id type not accepted (only string and object): " + typeof input);
-      },
-      getNewContext: () => {
-        const ctx = {};
-        ctx.id = null;
-        ctx.modulo = null;
-        ctx.promise = null;
-        ctx.placeholder = null;
-        return ctx;
-      },
-      hasGetter: (ctx) => {
-        return typeof ctx.modulo.getter === "function";
-      },
-      applyGetter: (ctx, result) => {
-        return ctx.modulo.getter(result, ctx.modulo, this);
-      },
-      hasPlaceholderAndResultIsObject: (ctx, result) => {
-        return ctx.placeholder && result && typeof result === "object";
-      },
-      cacheResult: (ctx, result) => {
-        this.cache.set(ctx.id, result);
-      },
-      inputIsObject: input => {
-        return typeof input === "object";
-      },
-      inputIsString: input => {
-        return typeof input === "string";
-      },
-      deleteIdFromPending: ctx => {
-        this.pending.delete(ctx.id);
-      },
-      cachePending: ctx => {
-        this.pending.set(ctx.id, ctx.promise);
-      },
-      presetModuleAsObject: (input, ctx) => {
-        this.onLoad.resetsIdBasedOnInputTypeObject(input, ctx);
-        this.onLoad.buildsPrematureModule(input, ctx);
-      },
-      promiseModule: async (ctx) => {
-        const dependencies = await this.onLoad.loadDependencies(ctx);
-        let result = await this.resolveModule(ctx.modulo, dependencies);
-        if (this.onLoad.hasGetter(ctx)) result = await this.onLoad.applyGetter(ctx, result);
-        if (this.onLoad.hasPlaceholderAndResultIsObject(ctx, result)) return Object.assign(ctx.placeholder, result);
-        if (this.onLoad.hasId(ctx)) this.onLoad.cacheResult(ctx, result);
-        return result;
-      }
-    };
-
     // Carga un módulo (core del sistema)
-    async load(input, inputCtx = undefined) {
-      const ctx = inputCtx || this.onLoad.getNewContext();
-      // Preparamos el input según su tipo:
-      if (this.onLoad.inputIsObject(input)) this.onLoad.presetModuleAsObject(input, ctx);
-      else if (this.onLoad.inputIsString(input)) this.onLoad.resetsIdBasedOnInputTypeString(input, ctx);
-      else this.onLoad.complainOfInputType(input);
-      this.onLoad.complainOnMissingModule(ctx);
-      // Retornamos las cachés o en su defecto las inicializamos
-      if (this.onLoad.hasIdInCache(ctx)) return this.cache.get(ctx.id);
-      if (this.onLoad.hasIdInPending(ctx)) return this.pending.get(ctx.id);
-      if (this.onLoad.hasIdInModules(ctx)) ctx.modulo = this.modules.get(ctx.id);
-      if (this.onLoad.hasIdAndRequires(ctx)) this.onLoad.initalizePlaceholder(ctx);
-      // Gestionamos la resolución del módulo
-      ctx.promise = this.onLoad.promiseModule(ctx);
-      if (this.onLoad.hasId(ctx)) this.onLoad.cachePending(ctx);
-      return await ctx.promise.finally(() => {
-        if (this.onLoad.hasId(ctx)) this.onLoad.deleteIdFromPending(ctx);
-      });
+    async load(input) {
+      let id, modulo, placeholder = null, promise;
+      Gestiona_tipos_no_string:
+      if (typeof input === "object") {
+        Sin_id: {
+          id = false;
+        }
+        Construye_el_modulo_y_continua_el_flujo_padre: {
+          modulo = {
+            ...input,
+            type: this.getModuleType(input)
+          };
+        }
+      } else if (typeof input === "string") {
+        id = input;
+      } else {
+        throw new Error("module id type not accepted: " + typeof input);
+      }
+      Comprueba_modulo_existe:
+      if (id) {
+        this.assert(this.modules.has(id), `module not found: ${id}`);
+      }
+      Retorna_cacheo_si_eso:
+      if (id && this.cache.has(id)) {
+        return this.cache.get(id);
+      }
+      Retorna_pendiende_si_eso:
+      if (id && this.pending.has(id)) {
+        return this.pending.get(id);
+      }
+      Obtiene_modulo:
+      if (id) {
+        modulo = this.modules.get(id);
+      }
+      Polifilea_cache_tempranamente_con_un_placeholder:
+      if (id && modulo.requires && modulo.requires.length) {
+        placeholder = {};
+        this.cache.set(id, placeholder);
+      }
+      Inicio_de_accion_de_carga_de_modulo: {
+        promise = (async () => {
+          let dependencies, result;
+          Carga_dependencias: {
+            dependencies = await Promise.all(
+              (modulo.requires || []).map(dep => this.load(dep))
+            );
+          }
+          Resuelve_el_modulo_segun_tipo: {
+            result = await this.resolveModule(modulo, dependencies);
+          }
+          Aplica_getter_si_eso:
+          if (typeof modulo.getter === "function") {
+            result = await modulo.getter(result, modulo, this);
+          }
+          Polifilea_placeholder_si_es_objeto_y_retorna:
+          if (placeholder && result && typeof result === "object") {
+            Object.assign(placeholder, result);
+            return placeholder;
+          }
+          Cachea_resultado_y_retorna:
+          if (id) {
+            this.cache.set(id, result);
+          }
+          return result;
+        })();
+      }
+      Cachea_promise_de_modulo_en_pending:
+      if (id) {
+        this.pending.set(id, promise);
+      }
+      try {
+        Retorna_promise_resuelta: {
+          return await promise;
+        }
+      } finally {
+        Elimina_de_pending_al_modulo:
+        if (id) {
+          this.pending.delete(id);
+        }
+      }
     }
 
     // Ejecuta un módulo como función
