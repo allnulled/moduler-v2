@@ -30,7 +30,77 @@
       console.log(`[trace] ${method} ${[...args].map((arg, i) => i + "=" + typeof arg).join(",")}`);
     }
 
-    static jsonify = __SOURCE_FROM__("src/jsonify.js",1);
+    static jsonify = function(obj, space = 2) {
+      const seen = new WeakSet();
+      function walk(value, localKey) {
+        if (typeof localKey === "string") {
+          if (localKey.startsWith("__") && localKey.endsWith("__")) {
+            return `metakey::${localKey}::${typeof value}`;
+          }
+        }
+        // Primitivos
+        if (
+          value === null ||
+          typeof value === "string" ||
+          typeof value === "number" ||
+          typeof value === "boolean"
+        ) {
+          return value;
+        }
+        // Objetos
+        if (typeof value === "object") {
+          if (seen.has(value)) {
+            return undefined;
+          }
+          seen.add(value);
+          // Detectar objetos host peligrosos
+          const tag = Object.prototype.toString.call(value);
+          if (
+            tag === "[object Window]" ||
+            tag === "[object global]" ||
+            tag === "[object Chrome]" ||
+            value === globalThis
+          ) {
+            return { $type: "host-object", tag };
+          }
+          const output = Array.isArray(value) ? [] : {};
+          let descriptors;
+          try {
+            descriptors = Object.getOwnPropertyDescriptors(value);
+          } catch (e) {
+            return { $type: "uninspectable" };
+          }
+          for (const key of Object.keys(descriptors)) {
+            const desc = descriptors[key];
+            // Ignorar getters/setters
+            if (desc.get || desc.set) {
+              continue;
+            }
+            try {
+              output[key] = walk(desc.value, key);
+            } catch (e) {
+              output[key] = { $error: "access denied" };
+            }
+          }
+          // Funciones
+          if (typeof value === "function") {
+            let src = '"unavailable"';
+            try {
+              src = value.toString();
+            } catch (e) { }
+            return {
+              $type: "function",
+              source: src,
+              keys: Object.keys(value).join(",")
+            };
+          }
+          return output;
+        }
+        return undefined;
+      }
+      const clean = walk(obj);
+      return JSON.stringify(clean, null, space);
+    }
 
     static defaultBasedir = Environment.isNodejs ? process.cwd() : window.location.protocol + "//" + window.location.host + window.location.pathname;
 
@@ -73,6 +143,78 @@
         return this.load(options.name);
       }
       return this.load(options);
+    }
+
+    static jsonifySafe(obj, space = 2) {
+      const seen = new WeakSet();
+      function walk(value, localKey) {
+        if (typeof localKey === "string") {
+          if (localKey.startsWith("__") && localKey.endsWith("__")) {
+            return `metakey::${localKey}::${typeof value}`;
+          }
+        }
+        // Primitivos
+        if (
+          value === null ||
+          typeof value === "string" ||
+          typeof value === "number" ||
+          typeof value === "boolean"
+        ) {
+          return value;
+        }
+        // Objetos
+        if (typeof value === "object") {
+          if (seen.has(value)) {
+            return undefined;
+          }
+          seen.add(value);
+          // Detectar objetos host peligrosos
+          const tag = Object.prototype.toString.call(value);
+          if (
+            tag === "[object Window]" ||
+            tag === "[object global]" ||
+            tag === "[object Chrome]" ||
+            value === globalThis
+          ) {
+            return { $type: "host-object", tag };
+          }
+          const output = Array.isArray(value) ? [] : {};
+          let descriptors;
+          try {
+            descriptors = Object.getOwnPropertyDescriptors(value);
+          } catch (e) {
+            return { $type: "uninspectable" };
+          }
+          for (const key of Object.keys(descriptors)) {
+            const desc = descriptors[key];
+            // Ignorar getters/setters
+            if (desc.get || desc.set) {
+              continue;
+            }
+            try {
+              output[key] = walk(desc.value, key);
+            } catch (e) {
+              output[key] = { $error: "access denied" };
+            }
+          }
+          // Funciones
+          if (typeof value === "function") {
+            let src = '"unavailable"';
+            try {
+              src = value.toString();
+            } catch (e) { }
+            return {
+              $type: "function",
+              source: src,
+              keys: Object.keys(value).join(",")
+            };
+          }
+          return output;
+        }
+        return undefined;
+      }
+      const clean = walk(obj);
+      return JSON.stringify(clean, null, space);
     }
 
     getModuleType(options) {
@@ -321,9 +463,75 @@
 
   };
 
-  __SOURCE_FROM__("src/ModuleDefinition.js");
-  __SOURCE_FROM__("src/ModuleBundle.js");
-  __SOURCE_FROM__("src/ModulerV2Compiler.js");
+  const ModuleDefinition = class {
+  
+    constructor(props) {
+      this.$type = "ModuleDefinition";
+      Object.assign(this, props);
+    }
+  
+  };
+  const ModuleBundle = class ModuleBundle {
+  
+    constructor(options = {}) {
+      Object.assign(this, options);
+      this.$type = "ModuleBundle";
+    }
+  
+    async write(writeOptionsUser = {}) {
+      const writeOptions = Object.assign({}, writeOptionsUser);
+      return undefined;
+    }
+  
+  };
+  const ModulerV2Compiler = class ModulerV2Compiler extends ModulerV2 {
+  
+    constructor(basedir = this.constructor.defaultBasedir, compilerOptions = {}) {
+      super(basedir);
+      Object.assign(this, compilerOptions);
+    }
+  
+    assert(condition, message) {
+      if (!condition) throw new Error(message || "assert failed");
+    }
+  
+    async resolveModule(modulo, dependencies) {
+      let metadata = {
+        ...modulo,
+        type: modulo.type,
+        requires: dependencies,
+      };
+      console.log(modulo);
+      if (modulo.type === "value") {
+        metadata[modulo.type] = modulo.module;
+      } else if (modulo.type === "factory") {
+        metadata[modulo.type] = modulo.factory;
+      } else if (modulo.type === "file") {
+        metadata[modulo.type] = await this.loadFile(modulo.file);
+      } else if (modulo.type === "url") {
+        metadata[modulo.type] = await this.loadUrl(modulo.url);
+      } else if (modulo.type === "path") {
+        metadata[modulo.type] = await this.loadPath(modulo.path);
+      } else {
+        throw new Error(`module type not recognized: ${modulo.type}`);
+      }
+      return metadata;
+    }
+  
+    onLoad = this.$createOnLoad({
+  
+      
+  
+    });
+  
+  
+    async bundle(target, bundleOptions = {}) {
+      const output = await this.load(target);
+      return new ModuleBundle(output);
+    }
+  
+  };
+  
 
   ModulerV2.Compiler = ModulerV2Compiler;
   ModulerV2.Bundle = ModuleBundle;

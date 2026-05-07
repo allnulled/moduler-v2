@@ -196,7 +196,7 @@ modulador.define({
 
 ### Módulo tipo: path
 
-Este tipo se completará como uno de estos métodos, en este orden: (1) como `file + require` o (2) como `url`.
+Este tipo se completará como uno de estos métodos, en este orden (en función del entorno huésped): (1) como `readFile + eval` o (2) como `url`.
 
 ```js
 modulador.define({

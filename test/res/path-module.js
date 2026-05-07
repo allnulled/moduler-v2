@@ -1,1 +1,1 @@
-module.exports = 30;
+return 30;

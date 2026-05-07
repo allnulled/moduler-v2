@@ -9,9 +9,9 @@ const main = async function() {
     if(file.endsWith(".test.js")) {
       console.log(`[*] Testing: ${file}`);
       try {
-        await require(`${__dirname}/${file}`)(new ModulerV2());
+        await require(`${__dirname}/${file}`)(new ModulerV2(), ModulerV2);
       } catch (error) {
-        console.error("Fails on: " + file);
+        console.error("Fails on test of: " + file);
         errors.push({ test: file, error });
       }
     }

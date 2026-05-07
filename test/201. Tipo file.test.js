@@ -3,6 +3,7 @@ module.exports = async function (moduler) {
   moduler.define({
     name: "tipo file + require",
     file: `${__dirname}/res/file-module-using-require.js`,
+    flavour: "require",
   });
 
   moduler.define({
