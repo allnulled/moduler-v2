@@ -12,4 +12,10 @@ const ModulerV2Compiler = class ModulerV2Compiler extends ModulerV2 {
     return new ModuleBundle(this.modules);
   }
 
+  onLoad = this.$createOnLoad({
+    
+  });
+
+
+
 };

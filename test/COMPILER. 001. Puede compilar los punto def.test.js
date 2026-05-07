@@ -7,7 +7,6 @@ module.exports = async function (moduler, ModulerV2) {
       const compiler = new ModulerV2.Compiler(projectRoot);
       const moduleDefinition = await moduler.load(entry);
       const bundle = await compiler.bundle(entry);
-      await bundle.write({ outputDir: __dirname + "/res/compilations" });
       try {
         await bundleTest(bundle, moduleDefinition, compiler);
       } catch (error) {
@@ -30,8 +29,10 @@ module.exports = async function (moduler, ModulerV2) {
     [{ file: "test/res/compilables/example-2/main.js" }, async function (bundle, moduleDefinition, compiler) {
       moduler.assert(typeof moduleDefinition === "object", "el compilable de example-2/main.js está fallando (punto 1)");
       moduler.assert(moduleDefinition instanceof ModulerV2.Definition, "el compilable de example-2/0.js está fallando (punto 2)");
-      console.log(bundle);
-      console.log(ModulerV2.jsonify(bundle));
+      console.log(await bundle.write({ outputFile: __dirname + "/res/compilations/example-2.main.js" }));
+      // console.log(await bundle.write({ outputFile: __dirname + "/res/compilations/example-2.main.js" }));
+      // console.log(bundle);
+      // console.log(ModulerV2.jsonify(bundle));
       /*
       console.log("definition:", ModulerV2.jsonify(moduleDefinition));
       console.log(bundle);

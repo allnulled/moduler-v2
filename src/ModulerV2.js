@@ -34,12 +34,20 @@
 
     static defaultBasedir = Environment.isNodejs ? process.cwd() : window.location.protocol + "//" + window.location.host + window.location.pathname;
 
-    constructor() {
+    constructor(overriders = false) {
       this.trace("ModulerV2.constructor");
       this.basedir = this.constructor.defaultBasedir;
       this.modules = new Map(); // Definiciones de módulos: name → config
       this.cache = new Map(); // Cache de resultados finales (o placeholders)
       this.pending = new Map(); // Promises en curso (para evitar ejecuciones duplicadas)
+      this.counter = 0;
+      if(overriders) {
+        Object.assign(this, overriders);
+      }
+    }
+
+    increaseCounter() {
+      return this.counter++;
     }
 
     static env = Environment;
@@ -51,6 +59,13 @@
       if (!condition) throw new Error(message || "assert failed");
     }
 
+    fulfill(options) {
+      if(options.name && this.modules.has(options.name)) {
+        return this.modules.get(options.name);
+      }
+      return this.define(options);
+    }
+
     // Define un módulo
     define(options) {
       this.trace("ModulerV2.prototype.define");
@@ -60,7 +75,8 @@
       // Guarda la definición del módulo
       const moduleDefinition = {
         ...options,
-        type: this.getModuleType(options)
+        type: this.getModuleType(options),
+        order: this.increaseCounter(),
       };
       this.modules.set(name, moduleDefinition);
       return new ModuleDefinition(moduleDefinition);
@@ -83,8 +99,9 @@
               options.path ? "path" : "value";
     }
 
-    async resolveModule(modulo, dependencies) {
+    async resolveModule(ctx, dependencies) {
       this.trace("ModulerV2.prototype.resolveModule");
+      const modulo = ctx.modulo;
       let result = undefined;
       if (modulo.type === "value") {
         result = modulo.module;
@@ -95,15 +112,48 @@
           result = await result;
         }
       } else if (modulo.type === "file") {
-        result = await this.loadFile(modulo.file, modulo.arguments || {}, modulo.flavour || "eval");
+        result = await this.loadFile(modulo.file, modulo.arguments || {}, modulo.flavour || "eval", ctx);
       } else if (modulo.type === "url") {
-        result = await this.loadUrl(modulo.url, modulo.arguments || {});
+        result = await this.loadUrl(modulo.url, modulo.arguments || {}, ctx);
       } else if (modulo.type === "path") {
-        result = await this.loadPath(modulo.path, modulo.arguments);
+        result = await this.loadPath(modulo.path, modulo.arguments, ctx);
       } else {
         throw new Error(`module type not recognized: ${modulo.type}`);
       }
       return result;
+    }
+
+    deduceRef(input) {
+      if(input.name) {
+        return input.name;
+      }
+      const inputType = this.getModuleType(input);
+      if(inputType === "path") {
+        return `@path=${input.path}`;
+      }
+      if(inputType === "file") {
+        return `@file=${input.file}`;
+      }
+      if(inputType === "url") {
+        return `@url=${input.url}`;
+      }
+      if(inputType === "factory") {
+        return `@factory=${this.getRandomUid(10)}`;
+      }
+      // console.log(inputType);
+      return `@${inputType}=${this.getRandomUid(10) || input[inputType]}`;
+    }
+
+    getRandomUidChar(alphabet = "abcdefghijklmnopqrstuv0123456789") {
+      return alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+
+    getRandomUid(len = 10) {
+      let out = "";
+      while(out.length < len) {
+        out += this.getRandomUidChar();
+      }
+      return out;
     }
 
     $createOnLoad(extra = {}) {
@@ -120,7 +170,8 @@
           };
         },
         resetsIdBasedOnInputTypeObject: (input, ctx) => {
-          ctx.id = input.name || false;
+          ctx.id = null;
+          ctx.ref = this.deduceRef(input);
         },
         resetsIdBasedOnInputTypeString: (input, ctx) => {
           ctx.id = input;
@@ -189,7 +240,7 @@
         },
         promiseModule: async (ctx) => {
           const dependencies = await this.onLoad.loadDependencies(ctx);
-          let result = await this.resolveModule(ctx.modulo, dependencies);
+          let result = await this.resolveModule(ctx, dependencies);
           if (this.onLoad.hasGetter(ctx)) result = await this.onLoad.applyGetter(ctx, result);
           if (this.onLoad.hasPlaceholderAndResultIsObject(ctx, result)) return Object.assign(ctx.placeholder, result);
           if (this.onLoad.hasId(ctx)) this.onLoad.cacheResult(ctx, result);
@@ -265,7 +316,11 @@
       return (this.basedir ? this.basedir : "") + "/" + subpath;
     }
 
-    loadFile(fileInput, parameters = {}, flavour = "eval") {
+    resolveRelativePath(subpath) {
+      return this.resolvePath(subpath).replace(this.basedir, "").replace(/^\//g, "");
+    }
+
+    loadFile(fileInput, parameters = {}, flavour = "eval", ctx = null) {
       this.assert(typeof fileInput === "string", "file must be string");
       this.assert(typeof parameters === "object", "parameters must be object");
       this.assert(typeof flavour === "string", "flavour must be string");
@@ -275,48 +330,53 @@
       } else if (flavour === "import") {
         return import(file);
       } else if (flavour === "eval") {
-        return this.readFile(file).then(code => this.evaluateAsync(code, parameters, `@file = ${file}`));
+        return this.readFile(file).then(code => this.evaluateAsync(code, parameters, {
+          whoInCharge: `@file=${this.resolveRelativePath(file)}`,
+          whoInCharge2: ctx && ctx.id ? `@file=${this.resolveRelativePath(ctx.id)}` : null,
+        }));
       }
       throw new Error("flavour must be known");
     }
 
-    async loadUrl(urlInput, parameters = {}) {
+    async loadUrl(urlInput, parameters = {}, ctx = null) {
       this.assert(typeof urlInput === "string", "url must be string");
       this.assert(typeof parameters === "object", "parameters must be object");
       const url = this.resolvePath(urlInput);
-      return this.readUrl(url).then(code => this.evaluateAsync(code, parameters, `@url = ${url}`));
+      return this.readUrl(url).then(code => this.evaluateAsync(code, parameters, {
+        whoInCharge: `@url=${this.resolveRelativePath(url)}`,
+      }));
     }
 
-    loadPath(path, parameters = {}) {
+    loadPath(path, parameters = {}, ctx = null) {
       this.assert(typeof path === "string", "path must be string");
       this.assert(typeof parameters === "object", "parameters must be object");
       return this.env.isNodejs ? this.loadFile(path) : this.loadUrl(path);
     }
 
-    safeWrap(code, traceHelp) {
-      if(!traceHelp) {
+    safeWrap(code, whoInCharge) {
+      if(!whoInCharge) {
         return code;
       }
-      return `try { ${code} } catch(error) { console.log(${JSON.stringify("Error on eval of: " + traceHelp)}); throw error; }`;
+      return `try { ${code} } catch(error) { console.log(${JSON.stringify("Error on eval of: " + whoInCharge)}); throw error; }`;
     }
 
-    evaluateAsync(code, parametersInput = {}, traceHelp = false) {
+    evaluateAsync(code, parametersInput = {}, options = {}) {
       this.assert(typeof code === "string", "code must be string");
       this.assert(typeof parametersInput === "object", "parameters must be object");
-      const parameters = { $moduler: this, ...parametersInput };
+      this.assert(typeof options === "object", "options must be object");
+      const { whoInCharge = false } = options;
+      const parameters = { $moduler: this, define: this.newDefine(whoInCharge), ...parametersInput };
       const AsyncFunction = (async function () { }).constructor;
-      const asyncFunction = new AsyncFunction(...Object.keys(parameters), this.safeWrap(code, traceHelp));
+      const asyncFunction = new AsyncFunction(...Object.keys(parameters), this.safeWrap(code, whoInCharge));
       // console.log(this.safeWrap(code));
       return asyncFunction(...Object.values(parameters));
     }
 
-    evaluateSync(code, parametersInput = {}, traceHelp = false) {
-      this.assert(typeof code === "string", "code must be string");
-      this.assert(typeof parametersInput === "object", "parameters must be object");
-      const parameters = { $moduler: this, ...parametersInput };
-      const syncFunction = new Function(...Object.keys(parameters), this.safeWrap(code, traceHelp));
-      // console.log(this.safeWrap(code));
-      return syncFunction(...Object.values(parameters));
+    newDefine(id) {
+      return (options) => {
+        options.from = id;
+        return this.define(options);
+      };
     }
 
   };

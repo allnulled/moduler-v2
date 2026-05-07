@@ -1,4 +1,4 @@
-return $moduler.define({
+return define({
   name: "example-2/main",
   requires: [
     { path: "test/res/compilables/example-2/0.js" },
