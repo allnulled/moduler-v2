@@ -3,11 +3,11 @@
   const mod = factory();
   // Soporte navegador (window global)
   if (typeof window !== 'undefined') {
-    window['ModulerV2'] = mod;
+    window['ModulerV2Toolkit'] = mod;
   }
   // Soporte Node.js (global)
   if (typeof global !== 'undefined') {
-    global['ModulerV2'] = mod;
+    global['ModulerV2Toolkit'] = mod;
   }
   // Soporte CommonJS (require)
   if (typeof module !== 'undefined') {
@@ -101,12 +101,94 @@
       const clean = walk(obj);
       return JSON.stringify(clean, null, space);
     }
+    
+    static jsify = function jsify(obj, tab = 0, options = {}) {
+      if(typeof obj === "boolean") {
+        return obj ? "true" : "false";
+      }
+      if(typeof obj === "number") {
+        return "" + obj;
+      }
+      if(typeof obj === "string") {
+        return JSON.stringify(obj);
+      }
+      if(typeof obj === "undefined") {
+        return "undefined";
+      }
+      if(typeof obj === "object") {
+        if(obj === null) {
+          return "null";
+        }
+        if(Array.isArray(obj)) {
+          let js = "";
+          js += "[";
+          if(obj.length) {
+            for(let index=0; index<obj.length; index++) {
+              const item = obj[index];
+              if(index !== 0) js += ",";
+              js += "\n";
+              js += "  ".repeat(tab);
+              js += this.jsify(item, tab+1, options);
+            }
+            js += "\n";
+            js += "  ".repeat(tab);
+          }
+          js += "]";
+          return js;
+        } else {
+          let js = "";
+          const keys = Object.keys(obj);
+          js += "{";
+          if(keys.length) {
+            Iterating_keys:
+            for(let index=0; index<keys.length; index++) {
+              const key = keys[index];
+              const val = obj[key];
+              if(options.propertiesFilter) {
+                if(!options.propertiesFilter(key)) {
+                  continue Iterating_keys;
+                }
+              }
+              if(js !== "{") js += ",";
+              js += "\n";
+              js += "  ".repeat(tab);
+              js += (/[A-Za-z$_][A-Za-z0-9$_]*/g).test(key) ? key : JSON.stringify(key);
+              js += ": ";
+              js += this.jsify(val, tab+1, options);
+            }
+            js += "\n";
+            js += "  ".repeat(tab);
+          }
+          js += "}";
+          return js;
+        }
+      }
+      if(typeof obj === "function") {
+        let js = "";
+        js += obj.toString();
+        return js;
+      }
+      throw new Error("typeof not identified: " + typeof(obj));
+    }
+    
+    static jsprettify = function(code) {
+      if(typeof beautifier === "undefined") {
+        return code;
+      }
+      return beautifier.js(code, {
+        indent_size: 2,
+      });
+    }
+
+    static evalify = function(jsified) {
+      return eval(`(() => { return ${jsified}; })()`);
+    }
 
     static defaultBasedir = Environment.isNodejs ? process.cwd() : window.location.protocol + "//" + window.location.host + window.location.pathname;
 
-    constructor(overriders = false) {
+    constructor(overriders = false, basedir = false) {
       this.trace("ModulerV2.constructor");
-      this.basedir = this.constructor.defaultBasedir;
+      this.basedir = basedir || this.constructor.defaultBasedir;
       this.modules = new Map(); // Definiciones de módulos: name → config
       this.cache = new Map(); // Cache de resultados finales (o placeholders)
       this.pending = new Map(); // Promises en curso (para evitar ejecuciones duplicadas)
@@ -145,8 +227,8 @@
       // Guarda la definición del módulo
       const moduleDefinition = {
         ...options,
-        type: this.getModuleType(options),
-        order: this.increaseCounter(),
+        "@type": this.getModuleType(options),
+        "@order": this.increaseCounter(),
       };
       this.modules.set(name, moduleDefinition);
       return new ModuleDefinition(moduleDefinition);
@@ -172,23 +254,24 @@
     async resolveModule(ctx, dependencies) {
       this.trace("ModulerV2.prototype.resolveModule");
       const modulo = ctx.modulo;
+      const moduleType = modulo["@type"];
       let result = undefined;
-      if (modulo.type === "value") {
+      if (moduleType === "value") {
         result = modulo.module;
-      } else if (modulo.type === "factory") {
+      } else if (moduleType === "factory") {
         result = modulo.factory(...dependencies);
         Espera_si_factory_devuelve_promise:
         if (result instanceof Promise) {
           result = await result;
         }
-      } else if (modulo.type === "file") {
+      } else if (moduleType === "file") {
         result = await this.loadFile(modulo.file, modulo.arguments || {}, modulo.flavour || "eval", ctx);
-      } else if (modulo.type === "url") {
+      } else if (moduleType === "url") {
         result = await this.loadUrl(modulo.url, modulo.arguments || {}, ctx);
-      } else if (modulo.type === "path") {
+      } else if (moduleType === "path") {
         result = await this.loadPath(modulo.path, modulo.arguments, ctx);
       } else {
-        throw new Error(`module type not recognized: ${modulo.type}`);
+        throw new Error(`module type not recognized: ${moduleType}`);
       }
       return result;
     }
@@ -236,7 +319,7 @@
         buildsPrematureModule: (input, ctx) => {
           ctx.modulo = {
             ...input,
-            type: this.getModuleType(input)
+            "@type": this.getModuleType(input)
           };
         },
         resetsIdBasedOnInputTypeObject: (input, ctx) => {
@@ -444,7 +527,7 @@
 
     newDefine(id) {
       return (options) => {
-        options.from = id;
+        options["@from"] = id;
         return this.define(options);
       };
     }
@@ -465,26 +548,31 @@
       Object.assign(this, Object.fromEntries(modulesMap));
     }
   
-    writeModuleFor(source) {
+    writeModuleFor(moduleDefinition) {
+      const source = Object.keys(moduleDefinition).reduce((out, prop) => {
+        if(prop.startsWith("@")) return out;
+        out[prop] = moduleDefinition[prop];
+        return out;
+      }, {});
       let js = "";
-      js += `define(${ModulerV2.jsonify(source)});`;
+      js += `define(${ModulerV2.jsify(source)});`;
       return js;
     }
   
     async write(writeOptionsUser = {}) {
       const writeOptions = Object.assign({}, writeOptionsUser);
-      console.log(this);
-      if(writeOptions.outputDir) {
+      if (writeOptions.outputDir) {
         throw new Error("option «outputDir» not supported yet");
-      } else if(writeOptions.outputFile) {
+      } else if (writeOptions.outputFile) {
         const sources = Object.values(this).sort((a, b) => {
           return a.order <= b.order ? -1 : 1;
         });
         let js = "";
-        for(let index=0; index<sources.length; index++) {
-          const source = sources[index];
-          js += this.writeModuleFor(source) + "\n\n";
+        for (let index = 0; index < sources.length; index++) {
+          const moduleDefinition = sources[index];
+          js += this.writeModuleFor(moduleDefinition) + "\n\n";
         }
+        js = ModulerV2.jsprettify(js, 0);
         await require("fs").promises.writeFile(writeOptions.outputFile, js, "utf8");
         return js;
       }

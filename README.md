@@ -27,13 +27,16 @@ Módulos programáticos en JavaScript (nodejs o browser).
     - [Carga e instanciación directa de módulo predefinido de tipo clase](#carga-e-instanciación-directa-de-módulo-predefinido-de-tipo-clase)
   - [Uso avanzado - nivel 2](#uso-avanzado---nivel-2)
     - [Obtener tu compilador](#obtener-tu-compilador)
+    - [Compilar un js](#compilar-un-js)
+      - [Ficheros compilables](#ficheros-compilables)
+      - [Por qué usar name + path como método de modulación](#por-qué-usar-name--path-como-método-de-modulación)
 
 ## Instalación
 
 Solo tienes que:
 
-- Importar el fichero [`moduler-v2.js`](https://github.com/allnulled/moduler-v2/blob/main/moduler-v2.js)
-- Acceder a [`ModulerV2`](https://github.com/allnulled/moduler-v2/blob/main/moduler-v2.js#L23).
+- Importar el fichero [`moduler-v2.dist.js`](https://github.com/allnulled/moduler-v2/blob/main/moduler-v2.dist.js)
+- Acceder a [`ModulerV2Toolkit.ModulerV2`](https://github.com/allnulled/moduler-v2/blob/main/moduler-v2.dist.js).
 
 ## Uso
 
@@ -43,6 +46,8 @@ Principalmente se trataría de:
 - crear módulos
 - cargar módulos (asíncrono)
 - acceder módulos
+
+Luego hay usos más avanzados que también se explican.
 
 ## Ejemplos
 
@@ -235,7 +240,7 @@ moduler.define({
   requires: [
     { module: 1 },
     { factory: () => 2 },
-    { file: "./test/res/file-module-using-require-2.js" },
+    { file: "./test/files/file-module-using-require-2.js" },
   ],
   factory: function(d1, d2, d3) {
     return d1 + d2 + d3;
@@ -309,15 +314,61 @@ moduler.assert(15 === (await moduler.new("clase/1", [5, 10])).c, "moduler.protot
 
 El uso avanzado nivel 2 se caracteriza por orientarse a **features relacionadas con la compilación de código** y no solamente con la modulación.
 
-Para ello se explotará la clase `ModulerV2Compiler` y otras relacionadas, como `ModulerV2Compilation`.
+Para ello se explotará la clase `ModulerV2.Compiler` y otras relacionadas como `ModulerV2.Bundle` o `ModulerV2.Definition`.
 
 ### Obtener tu compilador
 
-El compilador `ModulerV2Compiler` es una clase que hereda del modulador `ModulerV2` porque tiene que hacer prácticamente lo mismo.
+Los parámetros del compilador por defecto son estos:
 
 ```js
-const nodeCompiler = new ModulerV2Compiler(process.cwd());
-const webCompiler = new ModulerV2Compiler(window.location.protocol +"//"+ window.location.host + window.location.pathname);
+// Valor por defecto en node:
+const nodeCompiler = new ModulerV2.Compiler(process.cwd());
+
+// Valor por defecto en browser:
+const webCompiler = new ModulerV2.Compiler(window.location.protocol +"//"+ window.location.host + window.location.pathname);
+
+// Valor por defecto adaptado al entorno:
+const compiler = new ModulerV2.Compiler();
 ```
 
-Esta sección todavía está en desarrollo, pero los valores por defecto en cada entorno serían esos.
+### Compilar un js
+
+Compilar un JS es una acción de 2 pasos:
+
+```js
+// Paso 1. Empaquetar:
+const bundle = await compiler.bundle("path/a/entrada.js");
+
+// Paso 2. Escribir:
+await bundle.write({ outputFile: "path/a/salida.js" });
+
+// Y aquí ya puedes importar el módulo:
+await compiler.load({ file: "path/a/salida.js" });
+```
+
+En el 3r paso estamos evaluando el módulo, después de analizarlo o persistirlo.
+
+#### Ficheros compilables
+
+Los ficheros js compilables deben ser a base de llamadas a `define`:
+
+```js
+define({
+  name: "Nombre del módulo",
+  module: "Valor del módulo"
+});
+```
+
+**NOTA:** Valen los tipos que se han comentado antes, pero no todos están soportados/testeados ahora mismo por la compilación.
+
+#### Por qué usar name + path como método de modulación
+
+El método recomendado de modulación es: `define({ name: "nombre", path: "path/desde/basedir/modulo.js" }}`.
+
+El método de modulación por **name+path** permite:
+
+- Cachear el valor del módulo
+- Cachear el identificador del módulo
+- Usarse en tiempo de compilación con `ModulerV2.Compiler`
+- Usarse en tiempo de ejecución con `ModulerV2`
+

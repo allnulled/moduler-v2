@@ -9,11 +9,12 @@ refrescador \
   -i "**.dist.*" \
   -i "**/dist.*" \
   -i "**/*.dist.*" \
-  -i "**/test/res/compilations/**/*" \
+  -i "**/test/files/compilations/**/*" \
   -d 0 \
   -e "sh" \
   -e "ts" \
   -e "tsx" \
+  -e "txt" \
   -e "js" \
   -e "json" \
   -e "css" \

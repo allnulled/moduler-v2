@@ -5,7 +5,7 @@ module.exports = async function(moduler) {
     requires: [
       { module: 1 },
       { factory: () => 2 },
-      { file: "./test/res/file-module-using-require-2.js", flavour: "require" },
+      { file: "./test/files/file-module-using-require-2.js", flavour: "require" },
     ],
     factory: function(d1, d2, d3) {
       return d1 + d2 + d3;

@@ -3,11 +3,11 @@
   const mod = factory();
   // Soporte navegador (window global)
   if (typeof window !== 'undefined') {
-    window['ModulerV2'] = mod;
+    window['ModulerV2Toolkit'] = mod;
   }
   // Soporte Node.js (global)
   if (typeof global !== 'undefined') {
-    global['ModulerV2'] = mod;
+    global['ModulerV2Toolkit'] = mod;
   }
   // Soporte CommonJS (require)
   if (typeof module !== 'undefined') {
@@ -31,12 +31,20 @@
     }
 
     static jsonify = __SOURCE_FROM__("src/jsonify.js",1);
+    
+    static jsify = __SOURCE_FROM__("src/jsify.js",1);
+    
+    static jsprettify = __SOURCE_FROM__("src/jsprettify.js",1);
+
+    static evalify = function(jsified) {
+      return eval(`(() => { return ${jsified}; })()`);
+    }
 
     static defaultBasedir = Environment.isNodejs ? process.cwd() : window.location.protocol + "//" + window.location.host + window.location.pathname;
 
-    constructor(overriders = false) {
+    constructor(overriders = false, basedir = false) {
       this.trace("ModulerV2.constructor");
-      this.basedir = this.constructor.defaultBasedir;
+      this.basedir = basedir || this.constructor.defaultBasedir;
       this.modules = new Map(); // Definiciones de módulos: name → config
       this.cache = new Map(); // Cache de resultados finales (o placeholders)
       this.pending = new Map(); // Promises en curso (para evitar ejecuciones duplicadas)
@@ -75,8 +83,8 @@
       // Guarda la definición del módulo
       const moduleDefinition = {
         ...options,
-        type: this.getModuleType(options),
-        order: this.increaseCounter(),
+        "@type": this.getModuleType(options),
+        "@order": this.increaseCounter(),
       };
       this.modules.set(name, moduleDefinition);
       return new ModuleDefinition(moduleDefinition);
@@ -102,23 +110,24 @@
     async resolveModule(ctx, dependencies) {
       this.trace("ModulerV2.prototype.resolveModule");
       const modulo = ctx.modulo;
+      const moduleType = modulo["@type"];
       let result = undefined;
-      if (modulo.type === "value") {
+      if (moduleType === "value") {
         result = modulo.module;
-      } else if (modulo.type === "factory") {
+      } else if (moduleType === "factory") {
         result = modulo.factory(...dependencies);
         Espera_si_factory_devuelve_promise:
         if (result instanceof Promise) {
           result = await result;
         }
-      } else if (modulo.type === "file") {
+      } else if (moduleType === "file") {
         result = await this.loadFile(modulo.file, modulo.arguments || {}, modulo.flavour || "eval", ctx);
-      } else if (modulo.type === "url") {
+      } else if (moduleType === "url") {
         result = await this.loadUrl(modulo.url, modulo.arguments || {}, ctx);
-      } else if (modulo.type === "path") {
+      } else if (moduleType === "path") {
         result = await this.loadPath(modulo.path, modulo.arguments, ctx);
       } else {
-        throw new Error(`module type not recognized: ${modulo.type}`);
+        throw new Error(`module type not recognized: ${moduleType}`);
       }
       return result;
     }
@@ -166,7 +175,7 @@
         buildsPrematureModule: (input, ctx) => {
           ctx.modulo = {
             ...input,
-            type: this.getModuleType(input)
+            "@type": this.getModuleType(input)
           };
         },
         resetsIdBasedOnInputTypeObject: (input, ctx) => {
@@ -374,7 +383,7 @@
 
     newDefine(id) {
       return (options) => {
-        options.from = id;
+        options["@from"] = id;
         return this.define(options);
       };
     }

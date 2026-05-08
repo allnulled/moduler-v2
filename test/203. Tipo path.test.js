@@ -2,7 +2,7 @@ module.exports = async function(moduler) {
   
   moduler.define({
     name: "tipo path",
-    path: `./test/res/path-module.js`,
+    path: `./test/files/path-module.js`,
   });
 
   const it = await moduler.load("tipo path");
