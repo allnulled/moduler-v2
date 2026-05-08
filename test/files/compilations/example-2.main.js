@@ -25,11 +25,11 @@ define({
 });
 
 define({
-  name: "example-2/main/2",
-  module: 2129
+  name: "example-2/main/1",
+  module: 2524
 });
 
 define({
-  name: "example-2/main/1",
-  module: 2524
+  name: "example-2/main/2",
+  module: 2129
 });

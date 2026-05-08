@@ -29,7 +29,6 @@ Módulos programáticos en JavaScript (nodejs o browser).
     - [Obtener tu compilador](#obtener-tu-compilador)
     - [Compilar un js](#compilar-un-js)
       - [Ficheros compilables](#ficheros-compilables)
-      - [Por qué usar name + path como método de modulación](#por-qué-usar-name--path-como-método-de-modulación)
 
 ## Instalación
 
@@ -346,7 +345,6 @@ await bundle.write({ outputFile: "path/a/salida.js" });
 await compiler.load({ file: "path/a/salida.js" });
 ```
 
-En el 3r paso estamos evaluando el módulo, después de analizarlo o persistirlo.
 
 #### Ficheros compilables
 
@@ -360,15 +358,4 @@ define({
 ```
 
 **NOTA:** Valen los tipos que se han comentado antes, pero no todos están soportados/testeados ahora mismo por la compilación.
-
-#### Por qué usar name + path como método de modulación
-
-El método recomendado de modulación es: `define({ name: "nombre", path: "path/desde/basedir/modulo.js" }}`.
-
-El método de modulación por **name+path** permite:
-
-- Cachear el valor del módulo
-- Cachear el identificador del módulo
-- Usarse en tiempo de compilación con `ModulerV2.Compiler`
-- Usarse en tiempo de ejecución con `ModulerV2`
 

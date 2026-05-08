@@ -62,6 +62,10 @@
 
     env = Environment;
 
+    static assert(condition, message) {
+      if (!condition) throw new Error(message || "assert failed");
+    }
+
     // Assert simple para validaciones internas
     assert(condition, message) {
       if (!condition) throw new Error(message || "assert failed");
@@ -393,12 +397,14 @@
   __SOURCE_FROM__("src/ModuleDefinition.js");
   __SOURCE_FROM__("src/ModuleBundle.js");
   __SOURCE_FROM__("src/ModulerV2Compiler.js");
+  __SOURCE_FROM__("src/FileWatcher.js");
 
   ModulerV2.Compiler = ModulerV2Compiler;
   ModulerV2.Bundle = ModuleBundle;
   ModulerV2.Definition = ModuleDefinition;
+  ModulerV2.FileWatcher = FileWatcher;
 
   // Export del sistema
-  return { Environment, ModulerV2, ModulerV2Compiler, ModuleBundle };
+  return { Environment, ModulerV2, ModulerV2Compiler, ModuleBundle, FileWatcher };
 
 });

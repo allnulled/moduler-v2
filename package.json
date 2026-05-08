@@ -3,10 +3,15 @@
   "version": "1.0.0",
   "main": "moduler-v2.dist.js",
   "scripts": {
-    "dev": "bash dev.sh"
+    "dev": "bash dev.sh",
+    "build": "node build.js",
+    "test": "node test/test.js"
   },
   "keywords": [],
   "author": "allnulled",
   "license": "WTFPL",
-  "description": "Módulos programáticos en JavaScript para nodejs o browser"
+  "description": "Módulos programáticos en JavaScript para nodejs o browser",
+  "devDependencies": {
+    "chokidar": "^5.0.0"
+  }
 }
