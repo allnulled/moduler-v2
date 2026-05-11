@@ -5,7 +5,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 
 refrescador \
-  -w "$(pwd)/.." \
+  -w "$(pwd)" \
   -i "**.dist.*" \
   -i "**/dist.*" \
   -i "**/*.dist.*" \

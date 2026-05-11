@@ -7,7 +7,6 @@ const main = async function() {
   const hasAllFlag = !!targets.filter(f => f === "*").length;
   const startsLikeTarget = function(file) {
     if(targets.length === 0) return true;
-    if(hasAllFlag) return true;
     for(let index=0; index<targets.length; index++) {
       const target = targets[index];
       if(file.startsWith(target)) {
@@ -16,6 +15,7 @@ const main = async function() {
         return false;
       }
     }
+    if(hasAllFlag) return true;
     return false;
   };
   const files = require("fs").readdirSync(__dirname);

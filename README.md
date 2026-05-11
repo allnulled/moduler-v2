@@ -29,6 +29,8 @@ Módulos programáticos en JavaScript (nodejs o browser).
     - [Obtener tu compilador](#obtener-tu-compilador)
     - [Compilar un js](#compilar-un-js)
       - [Ficheros compilables](#ficheros-compilables)
+      - [Ficheros \*.def.js](#ficheros-defjs)
+      - [Ficheros \*.glos.js](#ficheros-glosjs)
 
 ## Instalación
 
@@ -348,7 +350,7 @@ await compiler.load({ file: "path/a/salida.js" });
 
 #### Ficheros compilables
 
-Los ficheros js compilables deben ser a base de llamadas a `define`:
+Los ficheros js compilables deben componerse única y exclusivamente a base de llamadas a `define`:
 
 ```js
 define({
@@ -359,3 +361,27 @@ define({
 
 **NOTA:** Valen los tipos que se han comentado antes, pero no todos están soportados/testeados ahora mismo por la compilación.
 
+#### Ficheros *.def.js
+
+Los **ficheros de definiciones** o `.def.js` se caracterizan por ser cabeceras de módulos portables:
+
+- Solo hay llamadas a `define` en el primer nivel del script
+- Solo se cargan las cabeceras, que son compatibles con todos los entornos
+- Su ventaja es que son **módulos completos** porque son:
+   - **módulo node.js**: puede funcionar en node.js
+   - **módulo browser**: puede funcionar en browser
+   - **módulo compilable:** pueden usarse para compilarse (en compilation time) desde otros `.js`
+   - **módulo importable:** pueden usarse para importarse (en runtime) desde otros `.js`
+- Esto significa que al marcar un fichero como `.def.js`
+   - estás declarando todas estas propiedades en el fichero `.js`
+   - estás declarando que es **un fichero humano**
+   - estás pidiendo que ese fichero sea copiado en el `dist` del proyecto
+
+#### Ficheros *.glos.js
+
+Los **ficheros glosario** o `glos.js` se caracterizan por ser compilaciones de cabeceras de módulos portables:
+
+- Son ficheros generados por el compilador, nunca por el humano
+- Tienen una compilación concreta de definiciones dentro
+- Pueden convivir con otros módulos que importen módulos comunes
+- Y a la vez, optimizan su carga por centralizar las definiciones.

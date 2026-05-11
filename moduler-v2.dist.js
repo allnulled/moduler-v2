@@ -101,7 +101,7 @@
       const clean = walk(obj);
       return JSON.stringify(clean, null, space);
     }
-    
+
     static jsify = function jsify(obj, tab = 0, options = {}) {
       if(typeof obj === "boolean") {
         return obj ? "true" : "false";
@@ -170,7 +170,7 @@
       }
       throw new Error("typeof not identified: " + typeof(obj));
     }
-    
+
     static jsprettify = function(code) {
       if(typeof beautifier === "undefined") {
         return code;
@@ -180,11 +180,11 @@
       });
     }
 
-    static evalify = function(jsified) {
+    static evalify = function (jsified) {
       return eval(`(() => { return ${jsified}; })()`);
     }
 
-    static defaultBasedir = Environment.isNodejs ? process.cwd() : window.location.protocol + "//" + window.location.host + window.location.pathname;
+    static defaultBasedir = Environment.isBrowser ? window.location.protocol + "//" + window.location.host + window.location.pathname : process.cwd();
 
     constructor(overriders = false, basedir = false) {
       this.trace("ModulerV2.constructor");
@@ -193,7 +193,7 @@
       this.cache = new Map(); // Cache de resultados finales (o placeholders)
       this.pending = new Map(); // Promises en curso (para evitar ejecuciones duplicadas)
       this.counter = 0;
-      if(overriders) {
+      if (overriders) {
         Object.assign(this, overriders);
       }
     }
@@ -216,7 +216,7 @@
     }
 
     fulfill(options) {
-      if(options.name && this.modules.has(options.name)) {
+      if (options.name && this.modules.has(options.name)) {
         return this.modules.get(options.name);
       }
       return this.define(options);
@@ -281,20 +281,20 @@
     }
 
     deduceRef(input) {
-      if(input.name) {
+      if (input.name) {
         return input.name;
       }
       const inputType = this.getModuleType(input);
-      if(inputType === "path") {
+      if (inputType === "path") {
         return `@path=${input.path}`;
       }
-      if(inputType === "file") {
+      if (inputType === "file") {
         return `@file=${input.file}`;
       }
-      if(inputType === "url") {
+      if (inputType === "url") {
         return `@url=${input.url}`;
       }
-      if(inputType === "factory") {
+      if (inputType === "factory") {
         return `@factory=${this.getRandomUid(10)}`;
       }
       // console.log(inputType);
@@ -307,7 +307,7 @@
 
     getRandomUid(len = 10) {
       let out = "";
-      while(out.length < len) {
+      while (out.length < len) {
         out += this.getRandomUidChar();
       }
       return out;
@@ -452,12 +452,16 @@
       return this.cache.get(id);
     }
 
+    makeInjectable(source) {
+      return ModulerV2.Injector.inject(source, this);
+    }
+
     readFile(file) {
-      return require("fs").promises.readFile(file, "utf8");
+      return require("fs").promises.readFile(file, "utf8").then(this.makeInjectable);
     }
 
     readUrl(url) {
-      return fetch(url).then(res => res.text());
+      return fetch(url).then(res => res.text()).then(this.makeInjectable);
     }
 
     readPath(path) {
@@ -511,22 +515,32 @@
     }
 
     safeWrap(code, whoInCharge) {
-      if(!whoInCharge) {
+      if (!whoInCharge) {
         return code;
       }
       return `try { ${code} } catch(error) { console.log(${JSON.stringify("Error on eval of: " + whoInCharge)}); throw error; }`;
     }
 
-    evaluateAsync(code, parametersInput = {}, options = {}) {
+    async seeResolver(code) {
+      return code;
+      const injector = new this.constructor.Injector(code);
+      return injector;
+    }
+
+    async evaluateAsync(codeInput, parametersInput = {}, options = {}) {
+      let code = codeInput;
       this.assert(typeof code === "string", "code must be string");
       this.assert(typeof parametersInput === "object", "parameters must be object");
       this.assert(typeof options === "object", "options must be object");
       const { whoInCharge = false } = options;
       const parameters = { $moduler: this, define: this.newDefine(whoInCharge), ...parametersInput };
       const AsyncFunction = (async function () { }).constructor;
+      See_injection_to_any_code: {
+        code = await this.seeResolver(code);
+      }
       const asyncFunction = new AsyncFunction(...Object.keys(parameters), this.safeWrap(code, whoInCharge));
-      // console.log(this.safeWrap(code));
-      return asyncFunction(...Object.values(parameters));
+      const result = await asyncFunction(...Object.values(parameters));
+      return result;
     }
 
     newDefine(id) {
@@ -534,6 +548,13 @@
         options["@from"] = id;
         return this.define(options);
       };
+    }
+
+    async compile(target, outputOptions = {}, bundleOptions = {}) {
+      const compiler = new this.constructor.Compiler(this.basedir);
+      const bundle = await compiler.bundle(target, bundleOptions);
+      await bundle.write(outputOptions);
+      return { bundle };
     }
 
   };
@@ -602,134 +623,180 @@
     
   };
   
-  const FileWatcher = class {
-  
-    static assert(condition, message) {
-      if (!condition) throw new Error(message);
+  const ModulerV2Injector = class ModulerV2Injector {
+    static parse(source) {
+      const parser = new ModulerV2Injector(source);
+      return parser.parseInjectCalls();
     }
-  
-    static basic(options = {}) {
-      this.assert(typeof options === "object", "options must be object");
-      this.assert(typeof options.path === "string", "options.path must be string");
-      this.assert(typeof options.callback === "function", "options.callback must be function");
-      const { path, callback } = options;
-      const instanze = {};
-      instanze.watcher = require("chokidar").watch(path, {
-        ignoreInitial: true,
-        ...options.chokidar || {}
-      });
-      instanze.watcher.on("all", async (event, file) => {
-        const info = {
-          event,
-          file,
-          relfile: file.replace(path, ""),
-          watcher: instanze.watcher,
-          options,
-        };
-        Apply_middlewares:
-        if (options.middlewares) {
-          this.assert(Array.isArray(options.middlewares), "options.middlewares must be array");
-          if (!options.middlewares.length) {
-            break Apply_middlewares;
-          }
-          for (let index = 0; index < options.middlewares.length; index++) {
-            const middleware = options.middlewares[index];
-            const result = await middleware(info);
-            if (result instanceof AbortController) {
-              return;
-            }
-          }
-        }
-        await callback(info);
-      });
-      instanze.close = () => instanze.watcher.close();
-      instanze.ready = new Promise(resolve => {
-        instanze.watcher.on("ready", resolve);
-      });
-      if(options.onStart) {
-        options.onStart(options);
+    static async inject(source, moduler = new ModulerV2()) {
+      const matches = this.parse(source);
+      let output = source;
+      for (let i = matches.length - 1; i >= 0; i--) {
+        const match = matches[i];
+        const replacement = await this.resolveInjection(match, moduler);
+        output = output.slice(0, match.start) + replacement + output.slice(match.end);
       }
-      return instanze;
+      return output;
     }
-  
-    static tasks = class {
-      
-      static async makeSemaphorable(options) {
-        const fs = require("fs");
-        const path = require("path");
-        const semaphorePath = path.resolve(options.path, ".filewatcher.sem");
-        await fs.promises.writeFile(semaphorePath, "opened", "utf8");
-      }
-  
+    static resolveInjection(match, moduler) {
+      return moduler.readPath(match.inject);
     }
-  
-    static middlewares = class {
-  
-      static openSemaphoreEffect() {
-        return async function ({ relfile, event, options }) {
-          const fs = require("fs");
-          const path = require("path");
-          const semaphorePath = path.resolve(options.path, ".filewatcher.sem");
-          await fs.promises.writeFile(semaphorePath, "opened", "utf8");
-        };
-      }
-  
-      static closeSemaphoreEffect() {
-        return async function ({ relfile, event, options }) {
-          if(relfile === "/.filewatcher.sem") {
-            return new AbortController("interrupt");
-          }
-          const fs = require("fs");
-          const path = require("path");
-          const semaphorePath = path.resolve(options.path, ".filewatcher.sem");
-          let currentState;
-          try {
-            currentState = await fs.promises.readFile(semaphorePath, "utf8");
-          } catch (error) {
-            if (error.code === "ENOENT") {
-              await fs.promises.writeFile(semaphorePath, "opened", "utf8");
-              currentState = "opened";
-            } else {
-              throw error;
-            }
-          }
-          if (currentState === "closed") {
-            return new AbortController("interrupt");
-          }
-          await fs.promises.writeFile(semaphorePath, "closed", "utf8");
-        };
-      }
-  
-      static rollupEffect() {
-        return async function ({ relfile, event, options }) {
-          console.log("rollup effect from", event, relfile);
-          await new Promise((resolve, reject) => { setTimeout(resolve, 1000); });
-        };
-      }
-  
-      static onTouchEffect() {
-        return async function ({ relfile, event, options }) {
-          console.log("onTouch effect from", event, relfile);
-          await new Promise((resolve, reject) => { setTimeout(resolve, 1000); });
+    constructor(source) {
+      this.source = source;
+      this.length = source.length;
+      this.index = 0;
+    }
+    parseInjectCalls() {
+      if (this.index !== 0) throw new Error("Cannot call «parseInjectCalls» more than once");
+      const results = [];
+      while (this.index < this.length) {
+        const start = this.source.indexOf('inject(', this.index);
+        if (start === -1)
+          break;
+        this.index = start;
+        try {
+          const result = this.parseInjectCall();
+          results.push(result);
+        } catch (error) {
+          this.index = start + 1;
+          throw error;
         }
       }
-  
-      static wait(ms) {
-        return () => new Promise(resolve => {
-          setTimeout(resolve, ms);
-        });
-      }
-  
+      return results;
     }
+    parseInjectCall() {
+      const start = this.index;
+      this.consume('inject(');
+      // inject("...")
+      if (this.peek() !== '"')
+        throw new Error('inject requiere string literal');
+      const injectString = this.readString('"');
+      this.skipSpaces();
+      this.expect(')');
+      this.skipSpaces();
+      // .as.
+      this.consume('.as.');
+      // whatever
+      const asName = this.readIdentifier();
+      this.skipSpaces();
+      // (
+      this.expect('(');
+      const argsStart = this.index - 1;
+      this.readBalanced();
+      const end = this.index;
+      return {
+        start,
+        end,
+        inject: injectString,
+        as: asName,
+        args: "[" + this.source.slice(argsStart + 1, end - 1) + "]",
+        text: this.source.slice(start, end)
+      };
+    }
+    readBalanced() {
+      const stack = ['('];
+      while (this.index < this.length && stack.length) {
+        const c = this.peek();
+        // strings
+        if (c === '"' || c === "'") {
+          this.readString(c);
+          continue;
+        }
+        // ignorar `
+        if (c === '`') {
+          this.index++;
+          continue;
+        }
+        // openings
+        if (c === '(' || c === '[' || c === '{') {
+          stack.push(c);
+          this.index++;
+          continue;
+        }
+        // closings
+        if (c === ')' || c === ']' || c === '}') {
+          const open = stack.pop();
+          if (!this.matches(open, c))
+            throw new Error('delimitadores incorrectos');
+          this.index++;
+          continue;
+        }
+        this.index++;
+      }
+      if (stack.length)
+        throw new Error('bloque sin cerrar');
+    }
+    readString(quote) {
+      let result = '';
+      this.expect(quote);
+      while (this.index < this.length) {
+        const c = this.peek();
+        if (c === '\\') {
+          result += c;
+          this.index++;
+          result += this.peek();
+          this.index++;
+          continue;
+        }
+        if (c === quote) {
+          this.index++;
+          return result;
+        }
+        result += c;
+        this.index++;
+      }
+      throw new Error('string sin cerrar');
+    }
+    readIdentifier() {
+      const start = this.index;
+      while (
+        this.index < this.length &&
+        /[a-zA-Z0-9_$]/.test(this.peek())
+      ) {
+        this.index++;
+      }
+      if (start === this.index)
+        throw new Error('identificador esperado');
+      return this.source.slice(start, this.index);
+    }
+    matches(open, close) {
+      return (
+        (open === '(' && close === ')') ||
+        (open === '[' && close === ']') ||
+        (open === '{' && close === '}')
+      );
+    }
+    skipSpaces() {
+      while (
+        this.index < this.length &&
+        /\s/.test(this.peek())
+      ) {
+        this.index++;
+      }
+    }
+    consume(text) {
+      if (!this.source.startsWith(text, this.index))
+        throw new Error(`esperado "${text}"`);
   
-  };
+      this.index += text.length;
+    }
+    expect(char) {
+      if (this.peek() !== char)
+        throw new Error(`esperado "${char}"`);
+  
+      this.index++;
+    }
+    peek() {
+      return this.source[this.index];
+    }
+  }
 
+  ModulerV2.Injector = ModulerV2Injector;
   ModulerV2.Compiler = ModulerV2Compiler;
   ModulerV2.Bundle = ModuleBundle;
   ModulerV2.Definition = ModuleDefinition;
-  ModulerV2.FileWatcher = FileWatcher;
 
   // Export del sistema
-  return { Environment, ModulerV2, ModulerV2Compiler, ModuleBundle, FileWatcher };
+  return { Environment, ModulerV2, ModulerV2Compiler, ModuleBundle };
 
 });

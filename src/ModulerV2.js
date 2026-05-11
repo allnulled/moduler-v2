@@ -30,17 +30,17 @@
       console.log(`[trace] ${method} ${[...args].map((arg, i) => i + "=" + typeof arg).join(",")}`);
     }
 
-    static jsonify = __SOURCE_FROM__("src/jsonify.js",1);
-    
-    static jsify = __SOURCE_FROM__("src/jsify.js",1);
-    
-    static jsprettify = __SOURCE_FROM__("src/jsprettify.js",1);
+    static jsonify = __SOURCE_FROM__("src/jsonify.js", 1);
 
-    static evalify = function(jsified) {
+    static jsify = __SOURCE_FROM__("src/jsify.js", 1);
+
+    static jsprettify = __SOURCE_FROM__("src/jsprettify.js", 1);
+
+    static evalify = function (jsified) {
       return eval(`(() => { return ${jsified}; })()`);
     }
 
-    static defaultBasedir = Environment.isNodejs ? process.cwd() : window.location.protocol + "//" + window.location.host + window.location.pathname;
+    static defaultBasedir = Environment.isBrowser ? window.location.protocol + "//" + window.location.host + window.location.pathname : process.cwd();
 
     constructor(overriders = false, basedir = false) {
       this.trace("ModulerV2.constructor");
@@ -49,7 +49,7 @@
       this.cache = new Map(); // Cache de resultados finales (o placeholders)
       this.pending = new Map(); // Promises en curso (para evitar ejecuciones duplicadas)
       this.counter = 0;
-      if(overriders) {
+      if (overriders) {
         Object.assign(this, overriders);
       }
     }
@@ -72,7 +72,7 @@
     }
 
     fulfill(options) {
-      if(options.name && this.modules.has(options.name)) {
+      if (options.name && this.modules.has(options.name)) {
         return this.modules.get(options.name);
       }
       return this.define(options);
@@ -137,20 +137,20 @@
     }
 
     deduceRef(input) {
-      if(input.name) {
+      if (input.name) {
         return input.name;
       }
       const inputType = this.getModuleType(input);
-      if(inputType === "path") {
+      if (inputType === "path") {
         return `@path=${input.path}`;
       }
-      if(inputType === "file") {
+      if (inputType === "file") {
         return `@file=${input.file}`;
       }
-      if(inputType === "url") {
+      if (inputType === "url") {
         return `@url=${input.url}`;
       }
-      if(inputType === "factory") {
+      if (inputType === "factory") {
         return `@factory=${this.getRandomUid(10)}`;
       }
       // console.log(inputType);
@@ -163,7 +163,7 @@
 
     getRandomUid(len = 10) {
       let out = "";
-      while(out.length < len) {
+      while (out.length < len) {
         out += this.getRandomUidChar();
       }
       return out;
@@ -308,12 +308,16 @@
       return this.cache.get(id);
     }
 
+    makeInjectable(source) {
+      return ModulerV2.Injector.inject(source, this);
+    }
+
     readFile(file) {
-      return require("fs").promises.readFile(file, "utf8");
+      return require("fs").promises.readFile(file, "utf8").then(this.makeInjectable);
     }
 
     readUrl(url) {
-      return fetch(url).then(res => res.text());
+      return fetch(url).then(res => res.text()).then(this.makeInjectable);
     }
 
     readPath(path) {
@@ -367,22 +371,32 @@
     }
 
     safeWrap(code, whoInCharge) {
-      if(!whoInCharge) {
+      if (!whoInCharge) {
         return code;
       }
       return `try { ${code} } catch(error) { console.log(${JSON.stringify("Error on eval of: " + whoInCharge)}); throw error; }`;
     }
 
-    evaluateAsync(code, parametersInput = {}, options = {}) {
+    async seeResolver(code) {
+      return code;
+      const injector = new this.constructor.Injector(code);
+      return injector;
+    }
+
+    async evaluateAsync(codeInput, parametersInput = {}, options = {}) {
+      let code = codeInput;
       this.assert(typeof code === "string", "code must be string");
       this.assert(typeof parametersInput === "object", "parameters must be object");
       this.assert(typeof options === "object", "options must be object");
       const { whoInCharge = false } = options;
       const parameters = { $moduler: this, define: this.newDefine(whoInCharge), ...parametersInput };
       const AsyncFunction = (async function () { }).constructor;
+      See_injection_to_any_code: {
+        code = await this.seeResolver(code);
+      }
       const asyncFunction = new AsyncFunction(...Object.keys(parameters), this.safeWrap(code, whoInCharge));
-      // console.log(this.safeWrap(code));
-      return asyncFunction(...Object.values(parameters));
+      const result = await asyncFunction(...Object.values(parameters));
+      return result;
     }
 
     newDefine(id) {
@@ -392,19 +406,26 @@
       };
     }
 
+    async compile(target, outputOptions = {}, bundleOptions = {}) {
+      const compiler = new this.constructor.Compiler(this.basedir);
+      const bundle = await compiler.bundle(target, bundleOptions);
+      await bundle.write(outputOptions);
+      return { bundle };
+    }
+
   };
 
   __SOURCE_FROM__("src/ModuleDefinition.js");
   __SOURCE_FROM__("src/ModuleBundle.js");
   __SOURCE_FROM__("src/ModulerV2Compiler.js");
-  __SOURCE_FROM__("src/FileWatcher.js");
+  __SOURCE_FROM__("src/ModulerV2Injector.js");
 
+  ModulerV2.Injector = ModulerV2Injector;
   ModulerV2.Compiler = ModulerV2Compiler;
   ModulerV2.Bundle = ModuleBundle;
   ModulerV2.Definition = ModuleDefinition;
-  ModulerV2.FileWatcher = FileWatcher;
 
   // Export del sistema
-  return { Environment, ModulerV2, ModulerV2Compiler, ModuleBundle, FileWatcher };
+  return { Environment, ModulerV2, ModulerV2Compiler, ModuleBundle };
 
 });
