@@ -5,5 +5,5 @@ module.exports = async function (moduler, ModulerV2) {
   moduler.assert(output1[0].as === "source", "Injector.parse está fallando (punto 3)");
   moduler.assert(output1[1].inject === "test/files/compilables/example-3/injection/mod2.frag.js", "Injector.parse está fallando (punto 3)");
   moduler.assert(output1[1].as === "template", "Injector.parse está fallando (punto 3)");
-  console.log(output1);
+  // console.log(output1);
 }
