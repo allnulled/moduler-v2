@@ -28,12 +28,19 @@ Módulos programáticos en JavaScript (nodejs o browser).
   - [Uso avanzado - nivel 2](#uso-avanzado---nivel-2)
     - [Obtener tu compilador](#obtener-tu-compilador)
     - [Compilar un js](#compilar-un-js)
-      - [Ficheros compilables](#ficheros-compilables)
+    - [Métodos de módulación](#métodos-de-módulación)
+      - [Método de modulación codificada](#método-de-modulación-codificada)
+      - [Método de modulación programática](#método-de-modulación-programática)
+    - [Ficheros asociados a la modulación](#ficheros-asociados-a-la-modulación)
+      - [Ficheros \*.entry.js](#ficheros-entryjs)
       - [Ficheros \*.def.js](#ficheros-defjs)
       - [Ficheros \*.glos.js](#ficheros-glosjs)
+      - [Ficheros \*.frag.js](#ficheros-fragjs)
   - [Uso avanzado - nivel 3](#uso-avanzado---nivel-3)
     - [Diferencia entre nivel 2 y nivel 3](#diferencia-entre-nivel-2-y-nivel-3)
     - [Inyecciones directas de código](#inyecciones-directas-de-código)
+      - [Detalles técnicos de las inyecciones directas de código](#detalles-técnicos-de-las-inyecciones-directas-de-código)
+  - [Buenas prácticas](#buenas-prácticas)
 
 ## Instalación
 
@@ -351,18 +358,111 @@ await compiler.load({ file: "path/a/salida.js" });
 ```
 
 
-#### Ficheros compilables
+### Métodos de módulación
 
-Los ficheros js compilables deben componerse única y exclusivamente a base de llamadas a `define`:
+Hay distintos métodos de modulación en función del uso posterior que se requiera de ellos. A continuación se explican.
+
+#### Método de modulación codificada
+
+Consiste en inyectar en un fichero **código js crudo** de otro fichero.
+
+Es más performante.
+
+Lo consigues con `inject("ruta/a/modulo.js").as.code()` y compilando con `ModulerV2`.
+
+Los ficheros asociados a este tipo de modulación son: `.frag.js` básicamente.
+
+#### Método de modulación programática
+
+Consiste en inyectar en un fichero **lógica js viva** de otro fichero.
+
+Es menos performante que la modulación codificada, implicas al *runtime* en `fetch/read`.
+
+Pero consigues modulación programática, es decir, esta abstracción de módulo js sí vive en estructuras C++. La codificada vive un momento en el compile-time y como string y ya está.
+
+Esta modulación la consigues con `define({ name:"x", ... })` y luego `await $moduler.load("x")`.
+
+Los ficheros asociados a este tipo de modulación son: `.glos.js`, `.def.js` y `.entry.js`.
+
+Los ficheros js de módulos programáticos deben componerse única y exclusivamente a base de llamadas a `define`:
 
 ```js
 define({
-  name: "Nombre del módulo",
-  module: "Valor del módulo"
+  name: "Nombre del módulo 1",
+  module: "Valor del módulo 1"
+});
+
+define({
+  name: "Nombre del módulo 2",
+  module: "Valor del módulo 2"
+});
+
+define({
+  name: "Nombre del módulo 3",
+  module: "Valor del módulo 3"
 });
 ```
 
-**NOTA:** Valen los tipos que se han comentado antes, pero no todos están soportados/testeados ahora mismo por la compilación.
+Valen los tipos de módulo que se han comentado antes, pero no todos están soportados/testeados ahora mismo por la compilación.
+
+En el caso de querer una entrada de módulo compilada, usas el formato de `.entry.js`, que es lo mismo pero haciendo `return` de una definición:
+
+```js
+define({
+  name: "Nombre del módulo 1",
+  module: "Valor del módulo 1"
+});
+
+define({
+  name: "Nombre del módulo 2",
+  module: "Valor del módulo 2"
+});
+
+return define({
+  name: "Entrada de módulo",
+  requires: ["Nombre del módulo 1", "Nombre del módulo 2"],
+  module: "Entrada de módulo"
+});
+```
+
+Esto es así porque en el modo de compilación, se necesita conocer qué definición es la entrada concretamente, dado que se admiten ilimitadas definiciones en un mismo fichero, y el `return` nos lo resuelve.
+
+### Ficheros asociados a la modulación
+
+Los principales ficheros asociados a la modulación son los siguientes.
+
+#### Ficheros *.entry.js
+
+Los **ficheros de entrada** o `.entry.js` se caracterizan por ser la entrada de un módulo programático compilado.
+
+Los `.def.js` serían puntos de entrada de módulos programáticos **no compilados**, por otro lado.
+
+Cuando declaras un `.entry.js` estás diciendo que quieres:
+
+- Compilar este fichero con `ModulerV2`
+   - Producir un fichero `.glos.js` en el `dist` para este fichero
+   - Retornar con `return define(...)` el módulo de entrada que representa este fichero
+
+Así es como luce un fichero de entrada normalmente:
+
+```js
+return define({
+  name: "example-3/injected",
+  factory: function() {
+    return {
+      uno: inject("test/files/compilables/example-3/injection/mod1.frag.js").as.source(),
+      dos: inject("test/files/compilables/example-3/injection/mod2.frag.js").as.string(),
+      tres: inject("test/files/compilables/example-3/injection/mod3.frag.js").as.template({ param: 5 }),
+      cuatro: inject("test/files/compilables/example-3/injection/mod4.frag.js").as.template({ param: 6 }),
+      Clase1: class {
+        prop1 = inject("test/files/compilables/example-3/injection/Clase1.prototype.prop1.frag.js").as.source();
+        prop2 = inject("test/files/compilables/example-3/injection/Clase1.prototype.prop2.frag.js").as.source();
+        prop3 = inject("test/files/compilables/example-3/injection/Clase1.prototype.prop3.frag.js").as.source();
+      },
+    }
+  }
+});
+```
 
 #### Ficheros *.def.js
 
@@ -380,14 +480,67 @@ Los **ficheros de definiciones** o `.def.js` se caracterizan por ser cabeceras d
    - estás declarando que es **un fichero humano**
    - estás pidiendo que ese fichero sea copiado en el `dist` del proyecto
 
+De los `.def.js` no se espera que hagan `return define(...)` de ningún módulo concreto, porque no requieren de una entrada como los `.entry.js`.
+
 #### Ficheros *.glos.js
 
-Los **ficheros glosario** o `glos.js` se caracterizan por ser compilaciones de cabeceras de módulos portables:
+Los **ficheros glosario** o `.glos.js` se caracterizan por ser compilaciones de cabeceras de módulos portables:
 
 - Son ficheros generados por el compilador, nunca por el humano
 - Tienen una compilación concreta de definiciones dentro
 - Pueden convivir con otros módulos que importen módulos comunes
 - Y a la vez, optimizan su carga por centralizar las definiciones.
+
+#### Ficheros *.frag.js
+
+Los **ficheros fragmento** o `.frag.js` se caracterizan porque:
+
+- Son ficheros inyectables:
+   - con `inject("ruta").as.source()`
+   - con `inject("ruta").as.string()`
+   - con `inject("ruta").as.template({ arg1: 1 })`
+- Aceptan cualquier texto, no necesariamente JS válido.
+- Pensados para modular fragmentos de código:
+   - pero *performance-friendly*
+   - que no haya que hacer una llamada a buscar un módulo, etc. en runtime
+      - que si el entorno lo requiere, se hace
+   - pero resolver la modulación en compilation-time y ganar:
+      - velocidad en runtime
+         - no hay fetch, ni read, ni cache, ni módulos, ni APIs implicadas
+         - solo hay una ampliación del código fuente original en tiempo de compilación
+         - pero en development-time, tienes un sistema de modulación más
+      - compactabilidad del código
+         - no mediar la integración con llamadas a APIs
+         - no mediar la integración con módulos programáticos
+         - simplemente, inyectar código escrito en otro lado
+         - resulta en código más compacto, tanto en lectura como en evaluación
+      - reusabilidad con flexibilidad
+         - seguir teniendo módulos
+         - poder usar módulos con formas de código no adscritas al lenguaje
+            - reusar auténticos snippets que no son una gramática en JS
+            - como patrones de diseño, por ejemplo
+
+Los ficheros fragmento son las piezas de código **harcodeado** y no **programatico** internas de una API.
+
+Puedes reutilizarlo, pero no es la prioridad máxima.
+
+- Con `inject` se pretende dar una fórmula rápida y efectiva de modular a nivel humano.
+   - A nivel humano, sí hay una modulación, porque separas el código en ficheros.
+   - A nivel máquina, (en runtime) no hay una modulación, porque no se separa el código en ficheros, ni en módulos, ni en nada: es todo la misma pieza.
+
+Un fichero fragmento podría ser tranquilamente:
+
+```js
+500
+```
+
+O otro típico:
+
+```js
+var1 && ((var2 || var3) && (var4 || var5))
+```
+
+Y es importante considerar que no es lo mismo poner el `;` del final que no ponerlo, o incluso saltos de línea o espacios, cada byte será fielmente inyectado.
 
 ## Uso avanzado - nivel 3
 
@@ -417,7 +570,7 @@ El método clave por el que pasa esto es: `ModulerV2.prototype.makeInjectable`.
 Por ejemplo, tienes el test [`Co.002. Puede compilar los inject.test.js`](https://github.com/allnulled/moduler-v2/blob/main/test/Co.002.%20Puede%20compilar%20los%20inject.test.js):
 
 ```js
-define({
+return define({
   name: "example-3/injected",
   factory: function() {
     return {
@@ -429,7 +582,11 @@ define({
 });
 ```
 
-Este método global `inject` no existe ni se inyecta, pero es parseado por el método `makeInjectable` y reemplazado en runtime.
+Este ejemplo se retoma luego.
+
+#### Detalles técnicos de las inyecciones directas de código
+
+Este método global `inject` no existe ni se inyecta (`define` sí se inyecta), pero es parseado por el método `makeInjectable` después del `fetch/read` y reemplazado en runtime.
 
 El método `inject`:
 
@@ -444,3 +601,16 @@ El método `inject`:
       - los `"` también
       - cuando acaben de cerrarse, se cierra el `(` del principio con otr `)`
          - y ahí termina el parseo
+
+## Buenas prácticas
+
+- Guardar módulos programáticos en ficheros de definiciones o `.def.js`
+   - donde solo hay `define` dentro
+- Guardar entrada de módulo en ficheros de entrada o `.entry.js`
+   - donde solo hay `define` dentro
+   - donde hace un `return define(...)`
+- Guardar módulos inyectables en ficheros fragmento o `.frag.js`
+   - como en el ejemplo anterior del test [`Co.002. Puede compilar los inject.test.js`](https://github.com/allnulled/moduler-v2/blob/main/test/Co.002.%20Puede%20compilar%20los%20inject.test.js)
+   - los módulos son libres, no es necesaria una fórmula de JavaScript concreta, simplemente texto ya vale
+- Identificar rápidamente los ficheros `.glos.js` que son los que interesan en producción
+
