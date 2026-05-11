@@ -31,6 +31,9 @@ Módulos programáticos en JavaScript (nodejs o browser).
       - [Ficheros compilables](#ficheros-compilables)
       - [Ficheros \*.def.js](#ficheros-defjs)
       - [Ficheros \*.glos.js](#ficheros-glosjs)
+  - [Uso avanzado - nivel 3](#uso-avanzado---nivel-3)
+    - [Diferencia entre nivel 2 y nivel 3](#diferencia-entre-nivel-2-y-nivel-3)
+    - [Inyecciones directas de código](#inyecciones-directas-de-código)
 
 ## Instalación
 
@@ -385,3 +388,59 @@ Los **ficheros glosario** o `glos.js` se caracterizan por ser compilaciones de c
 - Tienen una compilación concreta de definiciones dentro
 - Pueden convivir con otros módulos que importen módulos comunes
 - Y a la vez, optimizan su carga por centralizar las definiciones.
+
+## Uso avanzado - nivel 3
+
+El uso avanzado nivel 3 se caracteriza por orientarse a **features relacionadas con la optimización del código modular**.
+
+### Diferencia entre nivel 2 y nivel 3
+
+Mientras que el **nivel 2** se preocupa por tener módulos:
+
+- compatibles entre sí
+- compatibles con los 2 entornos: node y browser
+- compatibles con los 2 tiempos: compilación y runtime
+
+En el **nivel 3** se preocupa por tener módulos:
+
+- optimizados para el runtime
+- con inyecciones de código *inline*
+- orientado a la **modulación en compilación**
+   - pero igualmente compatible con **modulación en runtime**
+
+### Inyecciones directas de código
+
+Cualquier fichero que sea leído (`readFile/readUrl` o `load`) por una clase `ModulerV2` tiene automáticamente 1 paso intermedio de inyecciones.
+
+El método clave por el que pasa esto es: `ModulerV2.prototype.makeInjectable`.
+
+Por ejemplo, tienes el test [`Co.002. Puede compilar los inject.test.js`](https://github.com/allnulled/moduler-v2/blob/main/test/Co.002.%20Puede%20compilar%20los%20inject.test.js):
+
+```js
+define({
+  name: "example-3/injected",
+  factory: function() {
+    return {
+      uno: inject("test/files/compilables/example-3/injection/mod1.frag.js").as.source(),
+      dos: inject("test/files/compilables/example-3/injection/mod2.frag.js").as.string(),
+      tres: inject("test/files/compilables/example-3/injection/mod3.frag.js").as.template({ param: 5 }),
+    }
+  }
+});
+```
+
+Este método global `inject` no existe ni se inyecta, pero es parseado por el método `makeInjectable` y reemplazado en runtime.
+
+El método `inject`:
+
+- No acepta nada que no sea string
+- Solo tiene estas 3 fórmulas: `as.source`, `as.string` y `as.template`
+- Los parámetros finales:
+   - no es javascript que entienda el contexto
+      - es texto que se evaluará como javascript en otro contexto diferente
+      - por tanto no encontrará variables del script
+   - pero sigue 1 norma léxica:
+      - los `(`, `{`, `[` deben cerrarse por orden
+      - los `"` también
+      - cuando acaben de cerrarse, se cierra el `(` del principio con otr `)`
+         - y ahí termina el parseo
